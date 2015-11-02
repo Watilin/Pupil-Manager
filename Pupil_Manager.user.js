@@ -17,29 +17,46 @@
 "use strict";
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
+ * [ARR] Array Generics Shim
  * [DAT] Data Retrieval
  * [UI]  UI Injection & Manipulation
  * [DEV] Development & Debug
  * [INI] Initialization
  */
 
+// [@ARR] Array Generics Shim //////////////////////////////////////////
+
+[ "forEach", "map", "filter", "reduce" ]
+  .forEach(function (methodName) {
+    if (!(methodName in Array)) {
+      Array[methodName] = function (iterable, callback, context) {
+        Array.prototype[methodName].call(iterable, callback, context);
+      };
+    }
+  });
+
 // [@DAT] Data Retrieval ///////////////////////////////////////////////
 
+function logRequestError(resp) {
+  console.warn("GM_xmlhttpRequest error: %d %s",
+               resp.status,
+               resp.statusText);
+}
+
 function requestContacts(callback) {
-  var params = {
-    name:     "u",
-    siteHost: "teacher-story.com",
-    host:     "teacher-story.com",
-    lang:     "fr",
-    jsm:      1,
-    sid:      unsafeWindow._tid.session.sid
-  };
+  var params = [
+    "name=u",
+    "siteHost=teacher-story.com",
+    "host=teacher-story.com",
+    "lang=fr",
+    "jsm=1",
+    "sid=unsafeWindow._tid.session.sid"
+  ].join(";");
 
   GM_xmlhttpRequest({
     method: "GET",
-
-    url: "http://twinoid.com/mod/searchContacts?" +
-      [ for (k of Object.keys(params)) k + "=" + params[k] ].join(";"),
+    url: "http://twinoid.com/mod/searchContacts?" + params,
+    onerror: logRequestError,
 
     onload: function (response) {
       console.log("GM request successful (code %d)", response.status);
@@ -53,15 +70,8 @@ function requestContacts(callback) {
       } else {
         console.log(text);
       }
-    },
-
-    onerror: function (resp) {
-      console.warn("GM_xmlhttpRequest error: %d %s",
-                   resp.status,
-                   resp.statusText);
     }
   });
-  console.log("GM request launched");
 }
 
 function parseContacts(html) {
@@ -185,9 +195,9 @@ function injectUIButton() {
   }
 
   if (!$refButton) throw "TODO: inserting button when no more pupils to send";
-  $button.className = [
-    for (cl of $refButton.classList) if (/button/i.test(cl)) cl
-  ].join(" ");
+  $button.className = Array.filter($refButton.classList, function (cl) {
+    return /button/i.test(cl);
+  }).join(" ");
   $refButton.parentNode.appendChild(document.createTextNode(" "));
   $refButton.parentNode.appendChild($button);
 
@@ -249,17 +259,17 @@ function fillContactTable($container) {
           $button.classList.add("used");
           $button.textContent = "…";
 
-          var params = {
-            chk:    document.querySelector("input[name=chk]").value,
-            o:      -1,
-            u_name: contact.name,
-            u:      contact.id
-          };
+          var params = [
+            "chk=" + document.querySelector("input[name=chk]").value,
+            "o=-1",
+            "u_name=" + contact.name,
+            "u=" + contact.id
+          ].join("&");
           GM_xmlhttpRequest({
             method: "GET",
-            url: "/sendStudent?" +
-              [ for (k of Object.keys(params)) k + "=" + params[k] ]
-                .join("&"),
+            url: "/sendStudent?" + params,
+            onerror: logRequestError,
+
             onload: function (response) {
               if (response.finalUrl.endsWith("/teacher")) {
                 $button.textContent = "Échec";
@@ -318,19 +328,6 @@ function fillContactTable($container) {
 
 // [@DEV] Development & Debug //////////////////////////////////////////
 
-[  ]
-  .forEach(f => {
-    exportFunction(f, unsafeWindow, { defineAs: f.name });
-  });
-
-// This gets rid of an annoying console message when developing with
-// Flash used
-addEventListener("load", function () {
-  var $unsafeClient = unsafeWindow.document.getElementById("client");
-  if ($unsafeClient && !$unsafeClient._js) {
-    exportFunction(function () {}, $unsafeClient, { defineAs: "_js" });
-  }
-});
 
 // [@INI] Initialization ///////////////////////////////////////////////
 
