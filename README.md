@@ -4,7 +4,7 @@
 
 ![Capture](capture.png)
 
-Ressentez la puissance de John Norray dans sa capacité, nouvellement acquise,
+Ressentez la puissance de James Norray dans sa capacité, nouvellement acquise,
 à expédier les élèves à la vitesse de la lumière !
 
 ## Installation
