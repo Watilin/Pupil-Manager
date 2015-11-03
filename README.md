@@ -2,7 +2,7 @@
 
 *Un outil pour le jeu [Teacher Story](http://teacher-story.com)*
 
-![Capture](https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/capture.png)
+![Capture](capture.png)
 
 Ressentez la puissance de John Norray dans sa capacité, nouvellement acquise,
 à expédier les élèves à la vitesse de la lumière !
@@ -15,7 +15,7 @@ votre navigateur.
 * Pour Firefox c'est [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
 * Pour Chrome c'est [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
 
-Ensuite, suivez ce lien : https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js
+Ensuite, suivez ce lien : [Pupil_Manager.user.js](https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js)
 Normalement votre monkey détecte le script et ouvre une fenêtre qui vous
 propose de l'installer. Acceptez, le téléchargement et l'installation ne
 prennent que quelques secondes.
