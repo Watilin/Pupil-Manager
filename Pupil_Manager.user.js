@@ -2,29 +2,41 @@
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @include       http://teacher-story.com/*
 // @version       1.0
-// @icon          icon.png
+//
+// @author        Watilin
+// @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+// @supportURL    https://github.com/Watilin/Pupil-Manager/issues
+//
+// @icon          https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/icon.png
+// @downloadURL   https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js
+// @updateURL     https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.meta.js
+//
+// @include       http://teacher-story.com/*
+// @nocompat
 // @noframes
+//
+// @grant         GM_info
 // @grant         GM_xmlhttpRequest
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
-// @resource      ui-html           ui.html
-// @resource      ui-style          ui.css
-// @resource      artwork           artwork.png
+//
+// @resource      ui-html           ui.html?=v1.0
+// @resource      ui-style          ui.css?v=1.0
+// @resource      artwork           artwork.png?v=1.0
 // ==/UserScript==
 
 "use strict";
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
- * [ARR] Array Generics Shim
+ * [SHI] Shims for Retarded Browsers
  * [DAT] Data Retrieval
  * [UI]  UI Injection & Manipulation
  * [DEV] Development & Debug
- * [INI] Initialization
+ * [RUN] Run That Script!
  */
 
-// [@ARR] Array Generics Shim //////////////////////////////////////////
+// [@SHI] Shims for Retarded Browsers //////////////////////////////////
 
 [ "slice", "forEach", "map", "filter", "some", "every", "reduce" ]
   .forEach(function (methodName) {
@@ -34,6 +46,24 @@
       };
     }
   });
+
+if (!("contains" in String.prototype)) {
+  String.prototype.contains = function contains(sub) {
+    return this.indexOf(sub) >= 0;
+  };
+}
+
+if (!("startsWith" in String.prototype)) {
+  String.prototype.startsWith = function startsWith(sub) {
+    return 0 === this.indexOf(sub);
+  };
+}
+
+if (!("endsWith" in String.prototype)) {
+  String.prototype.endsWith = function endsWith(sub) {
+    return this.indexOf(sub) === this.length - sub.length;
+  };
+}
 
 // [@DAT] Data Retrieval ///////////////////////////////////////////////
 
@@ -124,7 +154,10 @@ function injectUIStyle() {
   var $link = document.createElement("link");
   $link.rel = "stylesheet";
   $link.type = "text/css";
-  $link.href = GM_getResourceURL("ui-style");
+  var handler = GM_info.scriptHandler;
+  $link.href =
+    ("Tampermonkey" === handler ? "data:text/css;base64," : "") +
+    GM_getResourceURL("ui-style");
   document.head.appendChild($link);
   return $link;
 }
@@ -141,6 +174,7 @@ function injectUIBox(nPupils) {
   var $pupils = $ui.querySelector(".pupils-to-send");
   if (!nPupils) {
     $pupils.textContent = "Il ne vous reste aucun élève à envoyer aujourd’hui.";
+    $ui.classList.add("no-more-pupils");
   } else {
     $pupils.querySelector("strong").textContent = nPupils +
       (nPupils > 1 ? " élèves" : " élève");
@@ -206,9 +240,11 @@ function injectUIButton() {
       caseTeacher();
       break;
 
+    case "/tid/forum":
     case "/game/results":
       // doesn’t inject Pupil Manager when the page has no
       // regular “send student” button
+      // TODO check if /game/victory should go here too
       return;
 
     default:
@@ -253,6 +289,7 @@ function fillContactTable($container) {
       var $nameCell         = $row.querySelector(".name");
       var $friendCell       = $row.querySelector(".friend");
       /*
+      TODO
       var $receivedCell     = $row.querySelector(".received");
       var $sentCell         = $row.querySelector(".sent");
       var $lastReceivedCell = $row.querySelector(".last-received");
@@ -394,7 +431,7 @@ function expose(value, name) {
   }
 }
 
-// [@INI] Initialization ///////////////////////////////////////////////
+// [@RUN] Run That Script! /////////////////////////////////////////////
 
 injectUIStyle();
 injectUIButton();

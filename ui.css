@@ -133,12 +133,12 @@ Tables on the “choose mission” page have these colors:
 #pupil-manager .contacts a.action.success { color: green; }
 #pupil-manager .contacts a.action.failure { color: red;   }
 
-#pupil-manager .contacts a.action.used,
-#pupil-manager.no-more-pupils .contacts a.action {
+#pupil-manager .contacts a.action.used {
   cursor: default;
   text-decoration: none;
 }
 
 #pupil-manager.no-more-pupils .contacts a.action {
+  cursor: not-allowed;
   text-decoration: line-through;
 }
