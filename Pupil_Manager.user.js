@@ -1,4 +1,4 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
@@ -26,7 +26,7 @@
 
 // [@ARR] Array Generics Shim //////////////////////////////////////////
 
-[ "forEach", "map", "filter", "reduce" ]
+[ "slice", "forEach", "map", "filter", "some", "every", "reduce" ]
   .forEach(function (methodName) {
     if (!(methodName in Array)) {
       Array[methodName] = function (iterable, callback, context) {
@@ -61,7 +61,8 @@ function requestContacts(callback) {
     onload: function (response) {
       console.log("GM request successful (code %d)", response.status);
       var text = response.responseText;
-      var match = text.match(/<div class="searchContacts">(?:.|\s)*<\/div>/);
+      var match =
+        text.match(/<div class="searchContacts">(?:.|\s)*<\/div>/);
       if (match) {
         var html = match[0]
           .replace(/\\r\\n/g, "")
@@ -145,7 +146,7 @@ function injectUIBox(nPupils) {
       (nPupils > 1 ? " élèves" : " élève");
   }
 
-  fillContactTable($ui.querySelector(".contacts"));
+  fillContactTable($ui);
 
   $ui.querySelector(".button").addEventListener("click", function (event) {
     event.preventDefault();
@@ -164,9 +165,27 @@ function injectUIButton() {
   $button.textContent = "Pupil Manager";
 
   var $refButton;
-  var $container;
   var nPupils = 0;
+  var $container;
   var className;
+
+  var caseTeacher = function caseTeacher() {
+    $refButton = document.querySelector(".banner .button");
+    if ($refButton) {
+      nPupils = parseInt(
+        document.querySelector(".banner strong").textContent, 10);
+      $container = $refButton.parentNode;
+    } else {
+      document.querySelector(".firstmenu").insertAdjacentHTML(
+        "afterend",
+        "<div class='clear'></div><div class='banner'></div>"
+      );
+      $container = document.querySelector(".banner");
+      $container.textContent = "Plus d’élèves à envoyer aujourd’hui… ";
+    }
+    className = "button mediumButton";
+  };
+
   switch (location.pathname) {
     case "/":
     case "/game":
@@ -174,10 +193,9 @@ function injectUIButton() {
       if ($refButton) {
         nPupils = $refButton.onmouseover.toString()
           .match(/<strong>(\d)/)[1];
-      } else {
-        $container = document.getElementById("gameInfos");
-        className = "button smallButton";
       }
+      $container = document.getElementById("gameInfos");
+      className = "button smallButton";
       break;
 
     case "/teacher":
@@ -185,38 +203,25 @@ function injectUIButton() {
     case "/help":
     case "/game/victory":
     case "/game/chooseMission":
-      $refButton = document.querySelector(".banner .button");
-      if ($refButton) {
-        nPupils = parseInt(
-          document.querySelector(".banner strong").textContent, 10
-        );
-      } else {
-        // $container = document.get;
-        className = "button mediumButton";
-      }
+      caseTeacher();
       break;
 
-    // TODO /game/results
+    case "/game/results":
+      // doesn’t inject Pupil Manager when the page has no
+      // regular “send student” button
+      return;
 
     default:
       if (location.pathname.startsWith("/teacher/")) {
-        $refButton = document.querySelector(".banner .button");
-        nPupils = parseInt(
-          document.querySelector(".banner strong").textContent, 10
-        );
+        caseTeacher();
       } else {
         throw "not implemented for " + location.pathname;
       }
   }
 
-  if (!$refButton) {
-    throw new Error("Nowhere to insert the button!");
-  }
-  $button.className = Array.filter($refButton.classList, function (cl) {
-    return /button/i.test(cl);
-  }).join(" ");
-  $refButton.parentNode.appendChild(document.createTextNode(" "));
-  $refButton.parentNode.appendChild($button);
+  $button.className = className;
+  $container.appendChild(document.createTextNode(" "));
+  $container.appendChild($button);
 
   var $ui;
   $button.addEventListener("click", function (event) {
@@ -230,8 +235,8 @@ function injectUIButton() {
 
 function fillContactTable($container) {
   requestContacts(function (html) {
-    var $table = $container.querySelector("table");
-    var $modelRow = $container.querySelector("tr.model");
+    var $table = $container.querySelector(".contacts table");
+    var $modelRow = $container.querySelector(".contacts tr.model");
     $modelRow.remove();
     $modelRow.classList.remove("model");
 
@@ -267,13 +272,15 @@ function fillContactTable($container) {
       $nameCell.textContent = contact.name;
       $friendCell.textContent = contact.friend ? "\u2665" : "";
 
-      var $pupilsLeft = $container.querySelector(".pupils-to-send strong");
+      var $pupilsLeft =
+        $container.querySelector(".pupils-to-send strong");
       $actionCell.querySelector(".send-now").addEventListener("click",
         function (event) {
           event.preventDefault();
 
           var $button = this;
           if ($button.classList.contains("used")) return;
+          if ($container.classList.contains("no-more-pupils")) return;
           $button.classList.add("used");
           $button.textContent = "…";
 
@@ -293,21 +300,23 @@ function fillContactTable($container) {
                 $button.textContent = "Échec";
                 $button.classList.add("failure");
                 var text = response.responseText;
-                console.log(text.match(/a déjà un élève à votre nom/g),
-                            text.match(/a atteint le maximum d'élèves/g));
                 if (text.contains("a déjà un élève à votre nom")) {
                   $statusCell.textContent = "a déjà un élève";
                 } else if (text.contains("a atteint le maximum")) {
                   $statusCell.textContent = "a atteint le maximum";
                 } else {
                   $statusCell.textContent = "raison inconnue";
+                  expose(text, "raisonInconnue");
                 }
               } else {
                 $button.textContent = "Ok\xA0!";
                 $button.classList.add("success");
                 var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
                 $pupilsLeft.textContent = nPupils +
-                  (nPupils > 1 ? " élèves" : "élève");
+                  (nPupils > 1 ? " élèves" : " élève");
+                if (!nPupils) {
+                  $container.classList.add("no-more-pupils");
+                }
               }
             }
           });
@@ -323,6 +332,7 @@ function fillContactTable($container) {
       var $pageButton = document.createElement("a");
       $pageButton.href = "#";
       $pageButton.textContent = i;
+
       $pageButton.addEventListener("click", function (event) {
         event.preventDefault();
         for (var j = 0; j < buttons.length; j++) {
@@ -350,7 +360,9 @@ function fillContactTable($container) {
 // [@DEV] Development & Debug //////////////////////////////////////////
 
 function expose(value, name) {
-  while (name in unsafeWindow) name += Math.random().toString(36).substr(2);
+  while (name in unsafeWindow) {
+    name += Math.random().toString(36).substr(2);
+  }
   switch (typeof value) {
     case "number":
     case "string":

@@ -87,6 +87,12 @@
   vertical-align: middle;
 }
 
+#pupil-manager .contacts td.status,
+#pupil-manager .contacts td.name {
+  width: 33%;
+  padding: 0;
+}
+
 #pupil-manager .contacts table img {
   display: block;
   margin: auto;
@@ -127,8 +133,12 @@ Tables on the “choose mission” page have these colors:
 #pupil-manager .contacts a.action.success { color: green; }
 #pupil-manager .contacts a.action.failure { color: red;   }
 
-#pupil-manager .contacts a.action.used {
+#pupil-manager .contacts a.action.used,
+#pupil-manager.no-more-pupils .contacts a.action {
   cursor: default;
   text-decoration: none;
-  opacity: 1;
+}
+
+#pupil-manager.no-more-pupils .contacts a.action {
+  text-decoration: line-through;
 }
