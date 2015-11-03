@@ -50,7 +50,7 @@ function requestContacts(callback) {
     "host=teacher-story.com",
     "lang=fr",
     "jsm=1",
-    "sid=unsafeWindow._tid.session.sid"
+    "sid=" + unsafeWindow._tid.session.sid
   ].join(";");
 
   GM_xmlhttpRequest({
@@ -68,7 +68,8 @@ function requestContacts(callback) {
           .replace(/src="\/\//g, "src=\"http://");
         callback.call(response, html);
       } else {
-        console.log(text);
+        console.log("unexpected server response");
+        expose(text, "serverResponse");
       }
     }
   });
@@ -92,10 +93,10 @@ function parseContacts(html) {
         var id = match[2];
         var $avatar = $elt.querySelector(".avatarImg");
         contacts.push({
-          id:     id,
-          name:   name,
-          friend: isFriend,
-          avatar: $avatar && $avatar.src
+          id     : id,
+          name   : name,
+          friend : isFriend,
+          avatar : $avatar && $avatar.src
         });
         break;
 
@@ -108,7 +109,7 @@ function parseContacts(html) {
       case "small": break;
 
       default:
-        console.warn("case %s not implemented", $elt.className);
+        console.warn("case %s not handled", $elt.className);
     }
     $elt.remove();
   }
@@ -160,16 +161,23 @@ function injectUIBox(nPupils) {
 function injectUIButton() {
   var $button = document.createElement("a");
   $button.id = "pupil-manager-button";
-  $button.textContent = "Gestion…";
+  $button.textContent = "Pupil Manager";
 
   var $refButton;
-  var nPupils;
+  var $container;
+  var nPupils = 0;
+  var className;
   switch (location.pathname) {
     case "/":
     case "/game":
       $refButton = document.querySelector("#gameInfos .button");
-      nPupils = $refButton.onmouseover.toString()
-        .match(/<strong>(\d)/)[1];
+      if ($refButton) {
+        nPupils = $refButton.onmouseover.toString()
+          .match(/<strong>(\d)/)[1];
+      } else {
+        $container = document.getElementById("gameInfos");
+        className = "button smallButton";
+      }
       break;
 
     case "/teacher":
@@ -178,10 +186,17 @@ function injectUIButton() {
     case "/game/victory":
     case "/game/chooseMission":
       $refButton = document.querySelector(".banner .button");
-      nPupils = parseInt(
-        document.querySelector(".banner strong").textContent, 10
-      );
+      if ($refButton) {
+        nPupils = parseInt(
+          document.querySelector(".banner strong").textContent, 10
+        );
+      } else {
+        // $container = document.get;
+        className = "button mediumButton";
+      }
       break;
+
+    // TODO /game/results
 
     default:
       if (location.pathname.startsWith("/teacher/")) {
@@ -194,7 +209,9 @@ function injectUIButton() {
       }
   }
 
-  if (!$refButton) throw "TODO: inserting button when no more pupils to send";
+  if (!$refButton) {
+    throw new Error("Nowhere to insert the button!");
+  }
   $button.className = Array.filter($refButton.classList, function (cl) {
     return /button/i.test(cl);
   }).join(" ");
@@ -250,6 +267,7 @@ function fillContactTable($container) {
       $nameCell.textContent = contact.name;
       $friendCell.textContent = contact.friend ? "\u2665" : "";
 
+      var $pupilsLeft = $container.querySelector(".pupils-to-send strong");
       $actionCell.querySelector(".send-now").addEventListener("click",
         function (event) {
           event.preventDefault();
@@ -287,6 +305,9 @@ function fillContactTable($container) {
               } else {
                 $button.textContent = "Ok\xA0!";
                 $button.classList.add("success");
+                var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
+                $pupilsLeft.textContent = nPupils +
+                  (nPupils > 1 ? " élèves" : "élève");
               }
             }
           });
@@ -328,6 +349,38 @@ function fillContactTable($container) {
 
 // [@DEV] Development & Debug //////////////////////////////////////////
 
+function expose(value, name) {
+  while (name in unsafeWindow) name += Math.random().toString(36).substr(2);
+  switch (typeof value) {
+    case "number":
+    case "string":
+    case "boolean":
+      unsafeWindow[name] = value;
+      console.log("exposed value with name %s", name);
+      break;
+    case "function":
+      if ("exportFunction" in this) {
+        exportFunction(value, unsafeWindow, {
+          defineAs: name,
+          allowCrossOriginArguments: true
+        });
+        console.log("exposed function with name %s", name);
+      } else {
+        throw new Error("can't expose sandboxed function");
+      }
+      break;
+    case "object":
+      if ("cloneInto" in this) {
+        unsafeWindow[name] = cloneInto(value, unsafeWindow);
+        console.log("exposed object with name %s", name);
+      } else {
+        throw new Error("can't expose sandboxed object");
+      }
+      break;
+    default:
+      throw new Error("expose: unsupported type!");
+  }
+}
 
 // [@INI] Initialization ///////////////////////////////////////////////
 
