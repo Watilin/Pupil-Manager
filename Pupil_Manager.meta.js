@@ -2,7 +2,7 @@
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.0
+// @version       1.0.1
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -21,7 +21,7 @@
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
 //
-// @resource      ui-html           ui.html?=v1.0
-// @resource      ui-style          ui.css?v=1.0
-// @resource      artwork           artwork.png?v=1.0
+// @resource      ui-html           ui.html?=v1.0.1
+// @resource      ui-style          ui.css?v=1.0.1
+// @resource      artwork           artwork.png?v=1.0.1
 // ==/UserScript==
