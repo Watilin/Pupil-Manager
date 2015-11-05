@@ -23,16 +23,22 @@
       <table style="display: none">
         <thead>
           <tr>
-            <th scope="col" colspan="2">Contact</th>
-            <th scope="col"> Ami&nbsp;?     </th>
+            <th scope="col" colspan="2" class="sortable"
+                data-sort-by="name">Contact</th>
+            <th scope="col" class="sortable"
+                data-sort-by="friend">Ami&nbsp;?</th>
             <!--
-            <th scope="col"> Reçus          </th>
-            <th scope="col"> Envoyés        </th>
-            <th scope="col"> Dernier reçu   </th>
-            <th scope="col"> Dernier envoyé </th>
+            <th scope="col" class="sortable"
+                data-sort-by="received">Reçus</th>
+            <th scope="col" class="sortable"
+                data-sort-by="sent">Envoyés</th>
+            <th scope="col" class="sortable"
+                data-sort-by="last-received">Dernier reçu</th>
+            <th scope="col" class="sortable"
+                data-sort-by="last-sent">Dernier envoyé</th>
             -->
-            <th scope="col"> Actions        </th>
-            <th scope="col"> Statut         </th>
+            <th scope="col">Actions</th>
+            <th scope="col">Statut</th>
           </tr>
           <tr class="model">
             <td class="pic"></td>
@@ -52,6 +58,7 @@
         </thead>
       </table>
       <p class="pagination">Page&nbsp;: </p>
+      <p>Cliquez sur les en-têtes de colonnes pour trier les contacts.</p>
     </div>
 
     <div class="atBottomLeft">

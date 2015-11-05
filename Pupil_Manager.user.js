@@ -2,7 +2,7 @@
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.0.1
+// @version       1.1
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -21,16 +21,16 @@
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
 //
-// @resource      ui-html           ui.html?=v1.0.1
-// @resource      ui-style          ui.css?v=1.0.1
-// @resource      artwork           artwork.png?v=1.0.1
+// @resource      ui-html           ui.html?=v1.1
+// @resource      ui-style          ui.css?v=1.1
+// @resource      artwork           artwork.png?v=1.1
 // ==/UserScript==
 
 "use strict";
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
  * [SHI] Shims for Retarded Browsers
- * [DAT] Data Retrieval
+ * [DAT] Data Retrieval & Sorting
  * [UI]  UI Injection & Manipulation
  * [DEV] Development & Debug
  * [RUN] Run That Script!
@@ -66,12 +66,6 @@ if (!("endsWith" in String.prototype)) {
 }
 
 // [@DAT] Data Retrieval ///////////////////////////////////////////////
-
-function logRequestError(resp) {
-  console.warn("GM_xmlhttpRequest error: %d %s",
-               resp.status,
-               resp.statusText);
-}
 
 function requestContacts(callback) {
   var params = [
@@ -274,11 +268,40 @@ function injectUIButton() {
 function fillContactTable($container) {
   requestContacts(function (html) {
     var $table = $container.querySelector(".contacts table");
+
+    var $pagination = $container.querySelector(".pagination");
+    var buttons = [];
+
+    var contacts = parseContacts(html);
+    var $$sortables = $container.getElementsByClassName("sortable");
+    Array.forEach($$sortables, function ($sortable) {
+      $sortable.addEventListener("click", function () {
+        Array.forEach($$sortables, function($) {
+          $.classList.remove("sort");
+        });
+
+        var criterion = this.dataset.sortBy;
+        var direction =
+          this.classList.contains("asc") ? "desc" : "asc";
+        if ("asc" === direction) {
+          this.classList.remove("desc");
+          this.classList.add("asc");
+        } else {
+          this.classList.remove("asc");
+          this.classList.add("desc");
+        }
+        this.classList.add("sort");
+
+        sortContactTable($table, criterion, direction);
+        $pagination.querySelector(".active").classList.remove("active");
+        buttons[0].classList.add("active");
+      });
+    });
+
     var $modelRow = $container.querySelector(".contacts tr.model");
     $modelRow.remove();
     $modelRow.classList.remove("model");
 
-    var contacts = parseContacts(html);
     var $tbody;
     contacts.forEach(function (contact, i) {
       if (!(i % 10)) $tbody = $table.createTBody();
@@ -362,9 +385,15 @@ function fillContactTable($container) {
         });
     });
 
-    var $pagination = $container.querySelector(".pagination");
     var $$tbodies = $table.getElementsByTagName("tbody");
-    var buttons = [];
+
+    /* This is a very interesting use case of getElementsByTagName
+      versus querySelectorAll: even when tbodies are later replaced,
+      the $$tbodies collection manages to correctly map the new tbodies.
+      Therefore, there is no need to update pagination links.
+      This is because getElementsByTagName returns a *live* collection,
+      whereas querySelectorAll returns a *static* one.
+    */
 
     var nPages = Math.ceil(contacts.length / 10);
     for (var i = 1; i <= nPages; i++) (function (i) {
@@ -375,10 +404,10 @@ function fillContactTable($container) {
       $pageButton.addEventListener("click", function (event) {
         event.preventDefault();
         for (var j = 0; j < buttons.length; j++) {
-          $$tbodies[j].style.display = "none";
+          $$tbodies[j].style.display = "none"; // magic happens here
           buttons[j].classList.remove("active");
         }
-        $$tbodies[i - 1].style.display = "";
+        $$tbodies[i - 1].style.display = ""; // and here
         buttons[i - 1].classList.add("active");
       });
 
@@ -396,7 +425,71 @@ function fillContactTable($container) {
   });
 }
 
+function sortContactTable($table, criterion, direction) {
+  /* TODO: Consider caching sorted views.
+    -> Is sorting contacts too CPU heavy?
+    On the other hand, caching might use a lot of memory.
+    -> What is best to preserve, memory or CPU?
+  */
+
+  // 1. retrieve all rows and push them into an array
+  var rows = Array.slice($table.querySelectorAll("tbody tr"));
+
+  // 2. remove all tbodies
+  Array.forEach($table.querySelectorAll("tbody"),
+    function ($tbody) { $tbody.remove(); });
+
+  // 3. sort rows
+  var sign = "asc" === direction ? 1 : -1;
+
+  // this is a homebrew mix of some western european collations
+  var collationRx =
+    /([áàâäæãå]+)|([éèêëẽ]+)|([íìîïĩ]+)|([óòôöœõø]+)|([úùûüũ]+)|([ýỳŷÿỹ]+)|([ç]+)|([ñ]+)|([ð]+)|([ß]+)|([þ]+)|([ĳ]+)/g;
+  var collationFn = function (_, a, e, i, o, u, y, c, n, d, ss, th, ij) {
+    if (a) return "a".repeat(a.length);
+    if (e) return "e".repeat(e.length);
+    if (i) return "i".repeat(i.length);
+    if (o) return "o".repeat(o.length);
+    if (u) return "u".repeat(u.length);
+    if (y) return "y".repeat(y.length);
+    if (c) return "c".repeat(c.length);
+    if (n) return "n".repeat(n.length);
+    if (d) return "d".repeat(d.length);
+    if (ss) return "ss".repeat(ss.length);
+    if (th) return "th".repeat(th.length);
+    if (ij) return "ij".repeat(ij.length);
+  };
+  rows.sort(function ($rowA, $rowB) {
+    var a = $rowA.querySelector("." + criterion).textContent;
+    var b = $rowB.querySelector("." + criterion).textContent;
+    var diff;
+    if (!isNaN(a) && !isNaN(b)) { // numeric comparison
+      diff = parseInt(a, 10) - parseInt(b, 10);
+    } else { // lexical comparison
+      a = a.toLowerCase().replace(collationRx, collationFn);
+      b = b.toLowerCase().replace(collationRx, collationFn);
+      diff = a < b ? -1 : 1;
+    }
+    return sign * diff;
+  });
+
+  // 4. insert rows in new tbodies by groups of 10
+  var $tbody;
+  rows.forEach(function ($row, i) {
+    if (!(i % 10)) $tbody = $table.createTBody();
+    $tbody.style.display = "none";
+    $tbody.appendChild($row);
+  });
+  $table.querySelector("tbody").style.display = "";
+}
+
 // [@DEV] Development & Debug //////////////////////////////////////////
+
+function logRequestError(resp) {
+  console.warn("GM_xmlhttpRequest error: %d %s",
+               resp.status,
+               resp.statusText);
+}
 
 function expose(value, name) {
   while (name in unsafeWindow) {
@@ -406,11 +499,12 @@ function expose(value, name) {
     case "number":
     case "string":
     case "boolean":
+    case "undefined":
       unsafeWindow[name] = value;
       console.log("exposed value with name %s", name);
       break;
     case "function":
-      if ("exportFunction" in this) {
+      if ("function" === typeof exportFunction) {
         exportFunction(value, unsafeWindow, {
           defineAs: name,
           allowCrossOriginArguments: true
@@ -421,7 +515,7 @@ function expose(value, name) {
       }
       break;
     case "object":
-      if ("cloneInto" in this) {
+      if ("function" === typeof cloneInto) {
         unsafeWindow[name] = cloneInto(value, unsafeWindow);
         console.log("exposed object with name %s", name);
       } else {

@@ -98,16 +98,10 @@
   margin: auto;
 }
 
-/* alternating & hovering rows */
-/*
-Tables on the “choose mission” page have these colors:
-  #E0E0FF   <-  .studentsList tr:nth-child(2n+1)
-  #F5F5FF   <-  .mission
-*/
+/* Alternating & Hovering Rows -------------------------------------- */
 
 #pupil-manager .contacts tbody tr {
   background: white;
-  /*border-bottom: solid thin #CDD;*/
 }
 
 #pupil-manager .contacts tbody tr:nth-child(even) {
@@ -117,7 +111,6 @@ Tables on the “choose mission” page have these colors:
 #pupil-manager .contacts tbody tr:hover {
   color: white;
   background: #4A9BA3;
-  /*border-color: #4A9BA3;*/
 }
 
 #pupil-manager .contacts tbody tr:hover a {
@@ -127,6 +120,12 @@ Tables on the “choose mission” page have these colors:
 #pupil-manager .contacts a.active {
   font-weight: bold;
 }
+
+/* Sorting ---------------------------------------------------------- */
+
+#pupil-manager .contacts th.sortable { cursor: pointer; }
+#pupil-manager .contacts th.sort.asc::before { content: "\25B2\00A0"; }
+#pupil-manager .contacts th.sort.desc::before { content: "\25BC\00A0"; }
 
 /* Action buttons --------------------------------------------------- */
 
