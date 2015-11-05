@@ -42,7 +42,8 @@
   .forEach(function (methodName) {
     if (!(methodName in Array)) {
       Array[methodName] = function (iterable, callback, context) {
-        Array.prototype[methodName].call(iterable, callback, context);
+        return Array.prototype[methodName]
+          .call(iterable, callback, context);
       };
     }
   });
