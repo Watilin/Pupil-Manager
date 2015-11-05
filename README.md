@@ -15,7 +15,7 @@ votre navigateur.
 * Pour Firefox c'est [![](http://kergoz-panic.fr/watilin/userscripts/greasemonkey16.png) Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
 * Pour Chrome c'est [![](http://kergoz-panic.fr/watilin/userscripts/tampermonkey16.png) Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
 
-Ensuite, suivez ce lien : [Pupil_Manager.user.js](https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js)
+Ensuite, suivez ce lien : [Pupil_Manager.user.js](https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js).
 Normalement votre monkey détecte le script et ouvre une fenêtre qui vous
 propose de l'installer. Acceptez, le téléchargement et l'installation ne
 prennent que quelques secondes.
@@ -37,20 +37,18 @@ puissance de Pupil Manager.
 * Possibilité de définir une priorité des contacts
 
 ## Historique des versions
+
 J'ai mis une license GPL, c'est ma faute, maintenant il faut que je tienne à jour la liste des changements. Alors voilà.
 
-### [v1.1](https://github.com/Watilin/Pupil-Manager/tree/v1.0.1)
-??/11/15
+* **[v1.1](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.1)**, ??/11/15
 
-* Ajout de la fonctionnalité de tri des contacts
+  * Possibilité de trier les contacts
 
-### [v1.0.1](https://github.com/Watilin/Pupil-Manager/tree/v1.0.1)
-04/11/15
+* **[v1.0.1](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.0.1)**, 04/11/15
 
-* Correction de la position du bouton sur certaines pages
+  * Correction de la position du bouton sur certaines pages
 
-### [V1.0](https://github.com/Watilin/Pupil-Manager/tree/v1.0)
-03/11/15
+* **[v1.0](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.0)**, 03/11/15
 
-* Création de la liste des contacts
-* Création du bouton d'envoi en un clic
+  * Création de la liste des contacts
+  * Création du bouton d'envoi en un clic
