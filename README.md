@@ -12,8 +12,8 @@ Ressentez la puissance de James Norray dans sa capacité, nouvellement acquise,
 Assurez-vous que vous avez l'extension pour gérer les userscripts dans
 votre navigateur.
 
-* Pour Firefox c'est [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
-* Pour Chrome c'est [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+* Pour Firefox c'est [![](http://kergoz-panic.fr/watilin/userscripts/greasemonkey16.png) Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
+* Pour Chrome c'est [![](http://kergoz-panic.fr/watilin/userscripts/tampermonkey16.png) Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
 
 Ensuite, suivez ce lien : [Pupil_Manager.user.js](https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.user.js)
 Normalement votre monkey détecte le script et ouvre une fenêtre qui vous
@@ -28,9 +28,29 @@ puissance de Pupil Manager.
 
 * Liste des contacts
 * Envoi en un clic
+* Tri des contacts
 
 ## À venir (très bientôt)
 
-* Tri/recherche des contacts
+* Recherche des contacts
 * Statistiques d'envoi/réception d'élèves par contact
 * Possibilité de définir une priorité des contacts
+
+## Historique des versions
+J'ai mis une license GPL, c'est ma faute, maintenant il faut que je tienne à jour la liste des changements. Alors voilà.
+
+### [v1.1](https://github.com/Watilin/Pupil-Manager/tree/v1.0.1)
+??/11/15
+
+* Ajout de la fonctionnalité de tri des contacts
+
+### [v1.0.1](https://github.com/Watilin/Pupil-Manager/tree/v1.0.1)
+04/11/15
+
+* Correction de la position du bouton sur certaines pages
+
+### [V1.0](https://github.com/Watilin/Pupil-Manager/tree/v1.0)
+03/11/15
+
+* Création de la liste des contacts
+* Création du bouton d'envoi en un clic
