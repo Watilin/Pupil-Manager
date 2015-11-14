@@ -1,8 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.1
+// @version       1.2
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -20,10 +20,12 @@
 // @grant         GM_xmlhttpRequest
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
+// @grant         GM_getValue
+// @grant         GM_setValue
 //
-// @resource      ui-html           ui.html?=v1.1
-// @resource      ui-style          ui.css?v=1.1
-// @resource      artwork           artwork.png?v=1.1
+// @resource      ui-html           ui.html?=v1.2
+// @resource      ui-style          ui.css?v=1.2
+// @resource      artwork           artwork.png?v=1.2
 // ==/UserScript==
 
 "use strict";
@@ -234,6 +236,7 @@ function injectUIButton() {
     case "/help":
     case "/game/victory":
     case "/game/chooseMission":
+    case "/levelUp":
       caseTeacher();
       break;
 
@@ -274,6 +277,8 @@ function fillContactTable($container) {
     var buttons = [];
 
     var contacts = parseContacts(html);
+    var tid = unsafeWindow._tid.session.tid;
+
     var $$sortables = $container.getElementsByClassName("sortable");
     Array.forEach($$sortables, function ($sortable) {
       $sortable.addEventListener("click", function () {
@@ -304,6 +309,14 @@ function fillContactTable($container) {
     $modelRow.classList.remove("model");
 
     var $tbody;
+    /* Contact structure in storage:
+      key: {string} <userId>-<contactId> (example: "378517-1355707")
+      {
+        sent:       {unsigned int}
+        lastSent:   {timestamp}
+        lastStatus: {enum("ok", "alreadySent", "maxedOut", "error")}
+      }
+    */
     contacts.forEach(function (contact, i) {
       if (!(i % 10)) $tbody = $table.createTBody();
       $tbody.style.display = "none";
@@ -314,12 +327,12 @@ function fillContactTable($container) {
       var $picCell          = $row.querySelector(".pic");
       var $nameCell         = $row.querySelector(".name");
       var $friendCell       = $row.querySelector(".friend");
+      var $sentCell         = $row.querySelector(".sent");
+      var $lastSentCell     = $row.querySelector(".last-sent");
       /*
       TODO
       var $receivedCell     = $row.querySelector(".received");
-      var $sentCell         = $row.querySelector(".sent");
       var $lastReceivedCell = $row.querySelector(".last-received");
-      var $lastSentCell     = $row.querySelector(".last-sent");
       */
       var $actionCell       = $row.querySelector(".action");
       var $statusCell       = $row.querySelector(".status");
