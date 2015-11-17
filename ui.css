@@ -117,10 +117,6 @@
   color: white;
 }
 
-#pupil-manager .contacts a.active {
-  font-weight: bold;
-}
-
 /* Sorting ---------------------------------------------------------- */
 
 #pupil-manager .contacts th.sortable { cursor: pointer; }
@@ -140,4 +136,14 @@
 #pupil-manager.no-more-pupils .contacts a.action {
   cursor: not-allowed;
   text-decoration: line-through;
+}
+
+/* Pagination buttons ----------------------------------------------- */
+
+#pupil-manager .contacts a.active {
+  font-weight: bold;
+}
+#pupil-manager .contacts a.relative {
+  font: bold 1.2em "Acme";
+  margin: 0 0.5ex;
 }

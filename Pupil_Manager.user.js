@@ -32,7 +32,7 @@
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
  * [SHI] Shims for Retarded Browsers
- * [DAT] Data Retrieval & Sorting
+ * [DAT] Data Retrieval
  * [UI]  UI Injection & Manipulation
  * [DEV] Development & Debug
  * [RUN] Run That Script!
@@ -275,6 +275,7 @@ function fillContactTable($container) {
 
     var $pagination = $container.querySelector(".pagination");
     var buttons = [];
+    var activePage;
 
     var contacts = parseContacts(html);
     var tid = unsafeWindow._tid.session.tid;
@@ -301,6 +302,7 @@ function fillContactTable($container) {
         sortContactTable($table, criterion, direction);
         $pagination.querySelector(".active").classList.remove("active");
         buttons[0].classList.add("active");
+        activePage = 1;
       });
     });
 
@@ -388,9 +390,12 @@ function fillContactTable($container) {
                 $button.textContent = "Ok\xA0!";
                 $button.classList.add("success");
                 var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
-                $pupilsLeft.textContent = nPupils +
+                if (nPupils) {
+                  $pupilsLeft.textContent = nPupils +
                   (nPupils > 1 ? " élèves" : " élève");
-                if (!nPupils) {
+                } else {
+                  $pupilsLeft.previousSibling.data = "Il ne vous reste ";
+                  $pupilsLeft.textContent = "aucun élève";
                   $container.classList.add("no-more-pupils");
                 }
               }
@@ -410,42 +415,79 @@ function fillContactTable($container) {
     */
 
     var nPages = Math.ceil(contacts.length / 10);
-    for (var i = 1; i <= nPages; i++) (function (i) {
-      var $pageButton = document.createElement("a");
-      $pageButton.href = "#";
-      $pageButton.textContent = i;
+    if (nPages < 2) $pagination.style.display = "none";
+    else {
+      for (var i = 1; i <= nPages; i++) (function (i) {
+        var $pageButton = document.createElement("a");
+        $pageButton.href = "#";
+        $pageButton.textContent = i;
 
-      $pageButton.addEventListener("click", function (event) {
-        event.preventDefault();
-        for (var j = 0; j < buttons.length; j++) {
-          $$tbodies[j].style.display = "none"; // magic happens here
-          buttons[j].classList.remove("active");
+        $pageButton.addEventListener("click", function (event) {
+          event.preventDefault();
+
+          $$tbodies[activePage - 1].style.display = "none"; // magic here
+          buttons[activePage - 1].classList.remove("active");
+
+          $$tbodies[i - 1].style.display = ""; // and here
+          buttons[i - 1].classList.add("active");
+          activePage = i;
+        });
+
+        buttons.push($pageButton);
+        $pagination.appendChild($pageButton);
+        if (i < nPages) {
+          $pagination.appendChild(document.createTextNode(" - "));
         }
-        $$tbodies[i - 1].style.display = ""; // and here
-        buttons[i - 1].classList.add("active");
-      });
+      }(i));
 
-      buttons.push($pageButton);
-      $pagination.appendChild($pageButton);
-      if (i < nPages) {
-        $pagination.appendChild(document.createTextNode(" - "));
-      }
-    }(i));
+      var $prevButton = document.createElement("a");
+      $prevButton.href = "#";
+      $prevButton.textContent = "<";
+      $prevButton.title = "Page précédente";
+      $prevButton.className = "relative";
+      $prevButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (activePage < 2) return;
+
+        $$tbodies[activePage - 1].style.display = "none";
+        buttons[activePage - 1].classList.remove("active");
+
+        activePage--;
+        $$tbodies[activePage - 1].style.display = "";
+        buttons[activePage - 1].classList.add("active");
+      });
+      $pagination.insertBefore($prevButton, buttons[0]);
+
+      var $nextButton = document.createElement("a");
+      $nextButton.href = "#";
+      $nextButton.textContent = ">";
+      $prevButton.title = "Page suivante";
+      $nextButton.className = "relative";
+      $nextButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (activePage >= nPages) return;
+
+        $$tbodies[activePage - 1].style.display = "none";
+        buttons[activePage - 1].classList.remove("active");
+
+        activePage++;
+        $$tbodies[activePage - 1].style.display = "";
+        buttons[activePage - 1].classList.add("active");
+      });
+      $pagination.appendChild($nextButton);
+
+      buttons[0].classList.add("active");
+      activePage = 1;
+    }
+
 
     $table.style.display = "";
-    buttons[0].classList.add("active");
     $table.querySelector("tbody").style.display = "";
     $container.querySelector(".loading").style.display = "none";
   });
 }
 
 function sortContactTable($table, criterion, direction) {
-  /* TODO: Consider caching sorted views.
-    -> Is sorting contacts too CPU heavy?
-    On the other hand, caching might use a lot of memory.
-    -> What is best to preserve, memory or CPU?
-  */
-
   // 1. retrieve all rows and push them into an array
   var rows = Array.slice($table.querySelectorAll("tbody tr"));
 
