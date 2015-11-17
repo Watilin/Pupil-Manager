@@ -40,7 +40,7 @@ puissance de Pupil Manager.
 
 J'ai mis une license GPL, c'est ma faute, maintenant il faut que je tienne à jour la liste des changements. Alors voilà.
 
-* **[v1.1](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.1)**, ??/11/15
+* **[v1.1](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.1)**, 05/11/15
 
   * Possibilité de trier les contacts
 
