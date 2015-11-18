@@ -419,7 +419,6 @@ function fillContactTable($container) {
               } else { // success
 
                 contactInfo.sent++;
-                $sentCell.textContent = contactInfo.sent;
                 contactInfo.status = "ok";
                 updateStatusCell($statusCell, "ok");
                 $button.textContent = "Ok\xA0!";
@@ -438,6 +437,7 @@ function fillContactTable($container) {
                   $sentCell, $lastSentCell, $statusCell, $actionCell);
 
               }
+              $sentCell.textContent = contactInfo.sent;
               GM_setValue(contactKey, JSON.stringify(contactInfo));
               console.log("contact info saved");
             }
@@ -564,16 +564,22 @@ function sortContactTable($table, criterion, direction) {
     if ("last-sent" === criterion) {
       a = $cellA.dataset.timestamp || 0;
       b = $cellB.dataset.timestamp || 0;
+      if (!a && !b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
     } else {
       a = $cellA.textContent;
       b = $cellB.textContent;
+      if ("–" === a && "–" === b) return 0;
+      if ("–" === a) return 1;
+      if ("–" === b) return -1;
     }
     if (!isNaN(a) && !isNaN(b)) { // numeric comparison
       diff = parseInt(a, 10) - parseInt(b, 10);
     } else { // lexical comparison
       a = a.toLowerCase().replace(collationRx, collationFn);
       b = b.toLowerCase().replace(collationRx, collationFn);
-      diff = a < b ? -1 : 1;
+      diff = a < b ? -1 : a > b ? 1 : 0;
     }
     return sign * diff;
   });
