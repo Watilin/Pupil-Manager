@@ -40,7 +40,7 @@ puissance de Pupil Manager.
 
 J'ai mis une license GPL, c'est ma faute, maintenant il faut que je tienne à jour la liste des changements. Alors voilà.
 
-* **[v1.2](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.2)**, ??/11/15
+* **[v1.2](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.2)**, 19/11/15
 
   * Ajout du nombre d’élèves envoyés par contact et de la date du dernier envoi
   * Ajout de boutons « précedent » et « suivant » dans la pagination
