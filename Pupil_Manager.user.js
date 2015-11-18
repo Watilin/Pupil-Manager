@@ -358,9 +358,9 @@ function fillContactTable($container) {
         updateDateCell($lastSentCell, contactInfo.lastSent);
         updateStatusCell($statusCell, contactInfo.status);
       } else {
-        $sentCell.textContent =     "—";
-        $lastSentCell.textContent = "—";
-        $statusCell.textContent =   "—";
+        $sentCell.textContent =     "–";
+        $lastSentCell.textContent = "–";
+        $statusCell.textContent =   "–";
       }
 
       var $pupilsLeft =
@@ -597,7 +597,7 @@ function updateDateCell($cell, timestamp) {
     (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
     (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
     date.toLocaleDateString();
-  $cell.title = date.toLocaleFormat();
+  $cell.title = date.toLocaleDateString() + " " + date.toLocaleTimeString();
   $cell.dataset.timestamp = timestamp;
 }
 
