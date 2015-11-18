@@ -264,6 +264,7 @@ function injectUIButton() {
     event.preventDefault();
     if (!$ui) $ui = injectUIBox(nPupils);
     $ui.style.display = "";
+    window.scrollTo(0, 0);
   });
 
   return $button;
@@ -314,9 +315,9 @@ function fillContactTable($container) {
     /* Contact structure in storage:
       key: {string} <userId>-<contactId> (example: "378517-1355707")
       {
-        sent:       {unsigned int}
-        lastSent:   {timestamp}
-        lastStatus: {enum("ok", "alreadySent", "maxedOut", "error")}
+        sent:     {unsigned int}
+        lastSent: {timestamp}
+        status:   {enum("ok", "alreadySent", "maxedOut", "error")}
       }
     */
     contacts.forEach(function (contact, i) {
@@ -329,19 +330,19 @@ function fillContactTable($container) {
       var $picCell          = $row.querySelector(".pic");
       var $nameCell         = $row.querySelector(".name");
       var $friendCell       = $row.querySelector(".friend");
-      var $sentCell         = $row.querySelector(".sent");
-      var $lastSentCell     = $row.querySelector(".last-sent");
       /*
       TODO
       var $receivedCell     = $row.querySelector(".received");
       var $lastReceivedCell = $row.querySelector(".last-received");
       */
-      var $actionCell       = $row.querySelector(".action");
+      var $sentCell         = $row.querySelector(".sent");
+      var $lastSentCell     = $row.querySelector(".last-sent");
       var $statusCell       = $row.querySelector(".status");
+      var $actionCell       = $row.querySelector(".action");
 
       if (contact.avatar) {
         var $img = new Image();
-        $img.alt = contact.name;
+        $img.alt = "";
         $img.width = 16;
         $img.height = 16;
         $img.src = contact.avatar;
@@ -349,6 +350,18 @@ function fillContactTable($container) {
       }
       $nameCell.textContent = contact.name;
       $friendCell.textContent = contact.friend ? "\u2665" : "";
+
+      var contactKey = tid + "-" + contact.id;
+      var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
+      if (contactInfo) {
+        $sentCell.textContent = contactInfo.sent;
+        updateDateCell($lastSentCell, contactInfo.lastSent);
+        updateStatusCell($statusCell, contactInfo.status);
+      } else {
+        $sentCell.textContent =     "—";
+        $lastSentCell.textContent = "—";
+        $statusCell.textContent =   "—";
+      }
 
       var $pupilsLeft =
         $container.querySelector(".pupils-to-send strong");
@@ -374,19 +387,41 @@ function fillContactTable($container) {
             onerror: logRequestError,
 
             onload: function (response) {
-              if (response.finalUrl.endsWith("/teacher")) {
+              var contactKey = tid + "-" + contact.id;
+              var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
+              if (!contactInfo) contactInfo = {};
+              if (!contactInfo.sent) contactInfo.sent = 0;
+
+              var now = Date.now();
+              contactInfo.lastSent = now;
+              updateDateCell($lastSentCell, now);
+
+              if (response.finalUrl.endsWith("/teacher")) { // failure
+
                 $button.textContent = "Échec";
                 $button.classList.add("failure");
+
                 var text = response.responseText;
+                var status;
                 if (text.contains("a déjà un élève à votre nom")) {
-                  $statusCell.textContent = "a déjà un élève";
+                  status = "alreadySent";
                 } else if (text.contains("a atteint le maximum")) {
-                  $statusCell.textContent = "a atteint le maximum";
+                  status = "maxedOut";
                 } else {
-                  $statusCell.textContent = "raison inconnue";
+                  status = "error";
                   expose(text, "raisonInconnue");
                 }
-              } else {
+                updateStatusCell($statusCell, status);
+                contactInfo.status = status;
+
+                highlightUpdate($lastSentCell, $statusCell, $actionCell);
+
+              } else { // success
+
+                contactInfo.sent++;
+                $sentCell.textContent = contactInfo.sent;
+                contactInfo.status = "ok";
+                updateStatusCell($statusCell, "ok");
                 $button.textContent = "Ok\xA0!";
                 $button.classList.add("success");
                 var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
@@ -398,7 +433,13 @@ function fillContactTable($container) {
                   $pupilsLeft.textContent = "aucun élève";
                   $container.classList.add("no-more-pupils");
                 }
+
+                highlightUpdate(
+                  $sentCell, $lastSentCell, $statusCell, $actionCell);
+
               }
+              GM_setValue(contactKey, JSON.stringify(contactInfo));
+              console.log("contact info saved");
             }
           });
         });
@@ -461,7 +502,7 @@ function fillContactTable($container) {
       var $nextButton = document.createElement("a");
       $nextButton.href = "#";
       $nextButton.textContent = ">";
-      $prevButton.title = "Page suivante";
+      $nextButton.title = "Page suivante";
       $nextButton.className = "relative";
       $nextButton.addEventListener("click", function (event) {
         event.preventDefault();
@@ -516,9 +557,17 @@ function sortContactTable($table, criterion, direction) {
     if (ij) return "ij".repeat(ij.length);
   };
   rows.sort(function ($rowA, $rowB) {
-    var a = $rowA.querySelector("." + criterion).textContent;
-    var b = $rowB.querySelector("." + criterion).textContent;
     var diff;
+    var $cellA = $rowA.querySelector("." + criterion);
+    var $cellB = $rowB.querySelector("." + criterion);
+    var a, b;
+    if ("last-sent" === criterion) {
+      a = $cellA.dataset.timestamp || 0;
+      b = $cellB.dataset.timestamp || 0;
+    } else {
+      a = $cellA.textContent;
+      b = $cellB.textContent;
+    }
     if (!isNaN(a) && !isNaN(b)) { // numeric comparison
       diff = parseInt(a, 10) - parseInt(b, 10);
     } else { // lexical comparison
@@ -537,6 +586,48 @@ function sortContactTable($table, criterion, direction) {
     $tbody.appendChild($row);
   });
   $table.querySelector("tbody").style.display = "";
+}
+
+function updateDateCell($cell, timestamp) {
+  var date = new Date(timestamp);
+  var diff = (Date.now() - date) / 1000;
+  $cell.textContent =
+    (diff < 60)        ? "< 1\xA0min" :
+    (diff < 3600)      ? "< 1\xA0h" :
+    (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
+    (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
+    date.toLocaleDateString();
+  $cell.title = date.toLocaleFormat();
+  $cell.dataset.timestamp = timestamp;
+}
+
+const StatusStrings = {
+  "ok"          : "ok",
+  "alreadySent" : "a déjà un élève",
+  "maxedOut"    : "a atteint le maximum",
+  "error"       : "raison inconnue"
+};
+
+function updateStatusCell($cell, status) {
+  $cell.textContent = StatusStrings[status];
+}
+
+function highlightUpdate($elem) {
+  if (arguments.length > 1) {
+    Array.forEach(arguments, function (arg) {
+      highlightUpdate(arg);
+    });
+    return;
+  }
+
+  $elem.classList.remove("with-transition");
+  requestAnimationFrame(function () {
+    $elem.classList.add("updated");
+    requestAnimationFrame(function () {
+      $elem.classList.add("with-transition");
+      $elem.classList.remove("updated");
+    });
+  });
 }
 
 // [@DEV] Development & Debug //////////////////////////////////////////
