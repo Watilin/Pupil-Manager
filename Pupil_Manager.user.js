@@ -1,8 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.1
+// @version       1.2
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -20,17 +20,19 @@
 // @grant         GM_xmlhttpRequest
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
+// @grant         GM_getValue
+// @grant         GM_setValue
 //
-// @resource      ui-html           ui.html?=v1.1
-// @resource      ui-style          ui.css?v=1.1
-// @resource      artwork           artwork.png?v=1.1
+// @resource      ui-html           ui.html?=v1.2
+// @resource      ui-style          ui.css?v=1.2
+// @resource      artwork           artwork.png?v=1.2
 // ==/UserScript==
 
 "use strict";
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
  * [SHI] Shims for Retarded Browsers
- * [DAT] Data Retrieval & Sorting
+ * [DAT] Data Retrieval
  * [UI]  UI Injection & Manipulation
  * [DEV] Development & Debug
  * [RUN] Run That Script!
@@ -234,6 +236,7 @@ function injectUIButton() {
     case "/help":
     case "/game/victory":
     case "/game/chooseMission":
+    case "/levelUp":
       caseTeacher();
       break;
 
@@ -261,6 +264,7 @@ function injectUIButton() {
     event.preventDefault();
     if (!$ui) $ui = injectUIBox(nPupils);
     $ui.style.display = "";
+    window.scrollTo(0, 0);
   });
 
   return $button;
@@ -272,8 +276,11 @@ function fillContactTable($container) {
 
     var $pagination = $container.querySelector(".pagination");
     var buttons = [];
+    var activePage;
 
     var contacts = parseContacts(html);
+    var tid = unsafeWindow._tid.session.tid;
+
     var $$sortables = $container.getElementsByClassName("sortable");
     Array.forEach($$sortables, function ($sortable) {
       $sortable.addEventListener("click", function () {
@@ -296,6 +303,7 @@ function fillContactTable($container) {
         sortContactTable($table, criterion, direction);
         $pagination.querySelector(".active").classList.remove("active");
         buttons[0].classList.add("active");
+        activePage = 1;
       });
     });
 
@@ -304,6 +312,14 @@ function fillContactTable($container) {
     $modelRow.classList.remove("model");
 
     var $tbody;
+    /* Contact structure in storage:
+      key: {string} <userId>-<contactId> (example: "378517-1355707")
+      {
+        sent:     {unsigned int}
+        lastSent: {timestamp}
+        status:   {enum("ok", "alreadySent", "maxedOut", "error")}
+      }
+    */
     contacts.forEach(function (contact, i) {
       if (!(i % 10)) $tbody = $table.createTBody();
       $tbody.style.display = "none";
@@ -317,16 +333,16 @@ function fillContactTable($container) {
       /*
       TODO
       var $receivedCell     = $row.querySelector(".received");
-      var $sentCell         = $row.querySelector(".sent");
       var $lastReceivedCell = $row.querySelector(".last-received");
-      var $lastSentCell     = $row.querySelector(".last-sent");
       */
-      var $actionCell       = $row.querySelector(".action");
+      var $sentCell         = $row.querySelector(".sent");
+      var $lastSentCell     = $row.querySelector(".last-sent");
       var $statusCell       = $row.querySelector(".status");
+      var $actionCell       = $row.querySelector(".action");
 
       if (contact.avatar) {
         var $img = new Image();
-        $img.alt = contact.name;
+        $img.alt = "";
         $img.width = 16;
         $img.height = 16;
         $img.src = contact.avatar;
@@ -334,6 +350,18 @@ function fillContactTable($container) {
       }
       $nameCell.textContent = contact.name;
       $friendCell.textContent = contact.friend ? "\u2665" : "";
+
+      var contactKey = tid + "-" + contact.id;
+      var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
+      if (contactInfo) {
+        $sentCell.textContent = contactInfo.sent;
+        updateDateCell($lastSentCell, contactInfo.lastSent);
+        updateStatusCell($statusCell, contactInfo.status);
+      } else {
+        $sentCell.textContent =     "–";
+        $lastSentCell.textContent = "–";
+        $statusCell.textContent =   "–";
+      }
 
       var $pupilsLeft =
         $container.querySelector(".pupils-to-send strong");
@@ -359,28 +387,59 @@ function fillContactTable($container) {
             onerror: logRequestError,
 
             onload: function (response) {
-              if (response.finalUrl.endsWith("/teacher")) {
+              var contactKey = tid + "-" + contact.id;
+              var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
+              if (!contactInfo) contactInfo = {};
+              if (!contactInfo.sent) contactInfo.sent = 0;
+
+              var now = Date.now();
+              contactInfo.lastSent = now;
+              updateDateCell($lastSentCell, now);
+
+              if (response.finalUrl.endsWith("/teacher")) { // failure
+
                 $button.textContent = "Échec";
                 $button.classList.add("failure");
+
                 var text = response.responseText;
+                var status;
                 if (text.contains("a déjà un élève à votre nom")) {
-                  $statusCell.textContent = "a déjà un élève";
+                  status = "alreadySent";
                 } else if (text.contains("a atteint le maximum")) {
-                  $statusCell.textContent = "a atteint le maximum";
+                  status = "maxedOut";
                 } else {
-                  $statusCell.textContent = "raison inconnue";
+                  status = "error";
                   expose(text, "raisonInconnue");
                 }
-              } else {
+                updateStatusCell($statusCell, status);
+                contactInfo.status = status;
+
+                highlightUpdate($lastSentCell, $statusCell, $actionCell);
+
+              } else { // success
+
+                contactInfo.sent++;
+                contactInfo.status = "ok";
+                updateStatusCell($statusCell, "ok");
                 $button.textContent = "Ok\xA0!";
                 $button.classList.add("success");
                 var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
-                $pupilsLeft.textContent = nPupils +
+                if (nPupils) {
+                  $pupilsLeft.textContent = nPupils +
                   (nPupils > 1 ? " élèves" : " élève");
-                if (!nPupils) {
+                } else {
+                  $pupilsLeft.previousSibling.data = "Il ne vous reste ";
+                  $pupilsLeft.textContent = "aucun élève";
                   $container.classList.add("no-more-pupils");
                 }
+
+                highlightUpdate(
+                  $sentCell, $lastSentCell, $statusCell, $actionCell);
+
               }
+              $sentCell.textContent = contactInfo.sent;
+              GM_setValue(contactKey, JSON.stringify(contactInfo));
+              console.log("contact info saved");
             }
           });
         });
@@ -397,42 +456,79 @@ function fillContactTable($container) {
     */
 
     var nPages = Math.ceil(contacts.length / 10);
-    for (var i = 1; i <= nPages; i++) (function (i) {
-      var $pageButton = document.createElement("a");
-      $pageButton.href = "#";
-      $pageButton.textContent = i;
+    if (nPages < 2) $pagination.style.display = "none";
+    else {
+      for (var i = 1; i <= nPages; i++) (function (i) {
+        var $pageButton = document.createElement("a");
+        $pageButton.href = "#";
+        $pageButton.textContent = i;
 
-      $pageButton.addEventListener("click", function (event) {
-        event.preventDefault();
-        for (var j = 0; j < buttons.length; j++) {
-          $$tbodies[j].style.display = "none"; // magic happens here
-          buttons[j].classList.remove("active");
+        $pageButton.addEventListener("click", function (event) {
+          event.preventDefault();
+
+          $$tbodies[activePage - 1].style.display = "none"; // magic here
+          buttons[activePage - 1].classList.remove("active");
+
+          $$tbodies[i - 1].style.display = ""; // and here
+          buttons[i - 1].classList.add("active");
+          activePage = i;
+        });
+
+        buttons.push($pageButton);
+        $pagination.appendChild($pageButton);
+        if (i < nPages) {
+          $pagination.appendChild(document.createTextNode(" - "));
         }
-        $$tbodies[i - 1].style.display = ""; // and here
-        buttons[i - 1].classList.add("active");
-      });
+      }(i));
 
-      buttons.push($pageButton);
-      $pagination.appendChild($pageButton);
-      if (i < nPages) {
-        $pagination.appendChild(document.createTextNode(" - "));
-      }
-    }(i));
+      var $prevButton = document.createElement("a");
+      $prevButton.href = "#";
+      $prevButton.textContent = "<";
+      $prevButton.title = "Page précédente";
+      $prevButton.className = "relative";
+      $prevButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (activePage < 2) return;
+
+        $$tbodies[activePage - 1].style.display = "none";
+        buttons[activePage - 1].classList.remove("active");
+
+        activePage--;
+        $$tbodies[activePage - 1].style.display = "";
+        buttons[activePage - 1].classList.add("active");
+      });
+      $pagination.insertBefore($prevButton, buttons[0]);
+
+      var $nextButton = document.createElement("a");
+      $nextButton.href = "#";
+      $nextButton.textContent = ">";
+      $nextButton.title = "Page suivante";
+      $nextButton.className = "relative";
+      $nextButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        if (activePage >= nPages) return;
+
+        $$tbodies[activePage - 1].style.display = "none";
+        buttons[activePage - 1].classList.remove("active");
+
+        activePage++;
+        $$tbodies[activePage - 1].style.display = "";
+        buttons[activePage - 1].classList.add("active");
+      });
+      $pagination.appendChild($nextButton);
+
+      buttons[0].classList.add("active");
+      activePage = 1;
+    }
+
 
     $table.style.display = "";
-    buttons[0].classList.add("active");
     $table.querySelector("tbody").style.display = "";
     $container.querySelector(".loading").style.display = "none";
   });
 }
 
 function sortContactTable($table, criterion, direction) {
-  /* TODO: Consider caching sorted views.
-    -> Is sorting contacts too CPU heavy?
-    On the other hand, caching might use a lot of memory.
-    -> What is best to preserve, memory or CPU?
-  */
-
   // 1. retrieve all rows and push them into an array
   var rows = Array.slice($table.querySelectorAll("tbody tr"));
 
@@ -461,15 +557,29 @@ function sortContactTable($table, criterion, direction) {
     if (ij) return "ij".repeat(ij.length);
   };
   rows.sort(function ($rowA, $rowB) {
-    var a = $rowA.querySelector("." + criterion).textContent;
-    var b = $rowB.querySelector("." + criterion).textContent;
     var diff;
+    var $cellA = $rowA.querySelector("." + criterion);
+    var $cellB = $rowB.querySelector("." + criterion);
+    var a, b;
+    if ("last-sent" === criterion) {
+      a = $cellA.dataset.timestamp || 0;
+      b = $cellB.dataset.timestamp || 0;
+      if (!a && !b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
+    } else {
+      a = $cellA.textContent;
+      b = $cellB.textContent;
+      if ("–" === a && "–" === b) return 0;
+      if ("–" === a) return 1;
+      if ("–" === b) return -1;
+    }
     if (!isNaN(a) && !isNaN(b)) { // numeric comparison
       diff = parseInt(a, 10) - parseInt(b, 10);
     } else { // lexical comparison
       a = a.toLowerCase().replace(collationRx, collationFn);
       b = b.toLowerCase().replace(collationRx, collationFn);
-      diff = a < b ? -1 : 1;
+      diff = a < b ? -1 : a > b ? 1 : 0;
     }
     return sign * diff;
   });
@@ -482,6 +592,48 @@ function sortContactTable($table, criterion, direction) {
     $tbody.appendChild($row);
   });
   $table.querySelector("tbody").style.display = "";
+}
+
+function updateDateCell($cell, timestamp) {
+  var date = new Date(timestamp);
+  var diff = (Date.now() - date) / 1000;
+  $cell.textContent =
+    (diff < 60)        ? "< 1\xA0min" :
+    (diff < 3600)      ? "< 1\xA0h" :
+    (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
+    (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
+    date.toLocaleDateString();
+  $cell.title = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  $cell.dataset.timestamp = timestamp;
+}
+
+const StatusStrings = {
+  "ok"          : "ok",
+  "alreadySent" : "a déjà un élève",
+  "maxedOut"    : "a atteint le maximum",
+  "error"       : "raison inconnue"
+};
+
+function updateStatusCell($cell, status) {
+  $cell.textContent = StatusStrings[status];
+}
+
+function highlightUpdate($elem) {
+  if (arguments.length > 1) {
+    Array.forEach(arguments, function (arg) {
+      highlightUpdate(arg);
+    });
+    return;
+  }
+
+  $elem.classList.remove("with-transition");
+  requestAnimationFrame(function () {
+    $elem.classList.add("updated");
+    requestAnimationFrame(function () {
+      $elem.classList.add("with-transition");
+      $elem.classList.remove("updated");
+    });
+  });
 }
 
 // [@DEV] Development & Debug //////////////////////////////////////////

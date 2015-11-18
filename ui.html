@@ -8,7 +8,7 @@
 
     <h2 class="orange">Gérer les envois d’élèves</h2>
 
-    <p class="info">Envoyez des élèves à plusieurs amis en un seul clic&nbsp;!
+    <p class="info">Envoyez des élèves à plusieurs amis en un seul clic&nbsp;
     <!-- , et consultez des statistiques sur les élèves reçus et envoyés. --></p>
 
     <div class="clear"></div>
@@ -31,14 +31,15 @@
             <th scope="col" class="sortable"
                 data-sort-by="received">Reçus</th>
             <th scope="col" class="sortable"
+                data-sort-by="last-received">Dernier reçu</th>
+            -->
+            <th scope="col" class="sortable"
                 data-sort-by="sent">Envoyés</th>
             <th scope="col" class="sortable"
-                data-sort-by="last-received">Dernier reçu</th>
+                data-sort-by="last-sent">Dernier envoi</th>
             <th scope="col" class="sortable"
-                data-sort-by="last-sent">Dernier envoyé</th>
-            -->
+                data-sort-by="status">Dernier statut</th>
             <th scope="col">Actions</th>
-            <th scope="col">Statut</th>
           </tr>
           <tr class="model">
             <td class="pic"></td>
@@ -46,14 +47,14 @@
             <td class="friend"></td>
             <!--
             <td class="received"></td>
-            <td class="sent"></td>
             <td class="last-received"></td>
-            <td class="last-sent"></td>
              -->
+            <td class="sent"></td>
+            <td class="last-sent"></td>
+            <td class="status"></td>
             <td class="action">
               <a href="#" class="action send-now">Envoyer</a>
             </td>
-            <td class="status"></td>
           </tr>
         </thead>
       </table>
