@@ -87,7 +87,6 @@
   vertical-align: middle;
 }
 
-#pupil-manager .contacts td.status,
 #pupil-manager .contacts td.name {
   width: 33%;
   padding: 0;
@@ -96,6 +95,9 @@
 #pupil-manager .contacts table img {
   display: block;
   margin: auto;
+}
+#pupil-manager .contacts table .last-sent[title] {
+  cursor: help;
 }
 
 /* Alternating & Hovering Rows -------------------------------------- */
@@ -113,12 +115,9 @@
   background: #4A9BA3;
 }
 
+
 #pupil-manager .contacts tbody tr:hover a {
   color: white;
-}
-
-#pupil-manager .contacts a.active {
-  font-weight: bold;
 }
 
 /* Sorting ---------------------------------------------------------- */
@@ -137,7 +136,26 @@
   text-decoration: none;
 }
 
+#pupil-manager .contacts .with-transition {
+  transition: background-color 2s;
+}
+
+#pupil-manager .contacts .updated {
+  background-color: #FC6;
+}
+
 #pupil-manager.no-more-pupils .contacts a.action {
   cursor: not-allowed;
   text-decoration: line-through;
+}
+
+/* Pagination buttons ----------------------------------------------- */
+
+#pupil-manager .contacts a.active {
+  font-weight: bold;
+}
+#pupil-manager .contacts a.relative {
+  font: bold 1.2em
+    Acme, "Segoe UI", "Trebuchet MS", "Lucida Console", sans-serif;
+  margin: 0 0.5ex;
 }
