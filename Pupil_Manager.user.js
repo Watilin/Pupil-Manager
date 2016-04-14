@@ -2,7 +2,7 @@
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.2
+// @version       1.2.1
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -13,19 +13,19 @@
 // @updateURL     https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.meta.js
 //
 // @include       http://teacher-story.com/*
+// @connect       twinoid.com
 // @nocompat
 // @noframes
 //
-// @grant         GM_info
 // @grant         GM_xmlhttpRequest
 // @grant         GM_getResourceText
 // @grant         GM_getResourceURL
 // @grant         GM_getValue
 // @grant         GM_setValue
 //
-// @resource      ui-html           ui.html?=v1.2
-// @resource      ui-style          ui.css?v=1.2
-// @resource      artwork           artwork.png?v=1.2
+// @resource      ui-html           ui.html?=v1.2.1
+// @resource      ui-style          ui.css?v=1.2.1
+// @resource      artwork           artwork.png?v=1.2.1
 // ==/UserScript==
 
 "use strict";
@@ -151,10 +151,7 @@ function injectUIStyle() {
   var $link = document.createElement("link");
   $link.rel = "stylesheet";
   $link.type = "text/css";
-  var handler = GM_info.scriptHandler;
-  $link.href =
-    ("Tampermonkey" === handler ? "data:text/css;base64," : "") +
-    GM_getResourceURL("ui-style");
+  $link.href = GM_getResourceURL("ui-style");
   document.head.appendChild($link);
   return $link;
 }
