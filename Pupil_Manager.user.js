@@ -677,6 +677,23 @@ function expose(value, name) {
   }
 }
 
+// quick test
+(function () {
+  var _f = unsafeWindow._tid.fillSidePanel;
+
+  unsafeWindow._tid.fillSidePanel = exportFunction(function (side) {
+    if (side !== "user") return _f(side);
+
+    return exportFunction(function (html) {
+      console.log(html.replace(/\s+/g, " "));
+      return _f.call(unsafeWindow._tid, side)(html);
+    }, unsafeWindow);
+
+  }, unsafeWindow._tid, {
+    defineAs: "fillSidePanel"
+  });
+}());
+
 // [@RUN] Run That Script! /////////////////////////////////////////////
 
 injectUIStyle();
