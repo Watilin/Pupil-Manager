@@ -655,13 +655,12 @@ function expose(value, name) {
       break;
     case "function":
       if ("function" === typeof exportFunction) {
-        exportFunction(value, unsafeWindow, {
-          defineAs: name,
+        unsafeWindow[name] = exportFunction(value, unsafeWindow, {
           allowCrossOriginArguments: true
         });
         console.log("exposed function with name %s", name);
       } else {
-        throw new Error("can't expose sandboxed function");
+        throw new Error("can’t expose sandboxed function");
       }
       break;
     case "object":
@@ -669,7 +668,7 @@ function expose(value, name) {
         unsafeWindow[name] = cloneInto(value, unsafeWindow);
         console.log("exposed object with name %s", name);
       } else {
-        throw new Error("can't expose sandboxed object");
+        throw new Error("can’t expose sandboxed object");
       }
       break;
     default:
@@ -677,22 +676,61 @@ function expose(value, name) {
   }
 }
 
-// quick test
+// not-so-quick-anymore test
 (function () {
   var _tid = unsafeWindow._tid;
-  var _initWS = _tid.initWS;
-  _tid.initWS = exportFunction(function () {
-    _initWS.call(_tid);
-    console.log('initWS has been called');
 
-    var ws = _tid.ws;
+  // keep track of incoming events through the web socket
+  var hookWsOnmessage = function hookWsOnmessage(ws) {
     var _onmessage = ws.onmessage;
     ws.onmessage = exportFunction(function (e) {
-      _onmessage.call(ws, e);
-      console.log(e.data);
-    }, _tid.ws);
+      // TODO check new incoming events
+      console.log("call to hooked onmessage");
 
-  }, _tid);
+      _onmessage.call(ws, e);
+    }, unsafeWindow);
+  };
+
+  // generally, ws is not ready when this userscript executes
+  if (_tid.ws) {
+    hookWsOnmessage(_tid.ws);
+  } else {
+    var _initWS = _tid.initWS;
+    _tid.initWS = exportFunction(function () {
+      _initWS.call(_tid);
+      _tid.initWS = _initWS;
+      hookWsOnmessage(_tid.ws);
+    }, unsafeWindow);
+  }
+
+  // hook fillSidePanel to retrieve panel content as soon as it loads
+  var _f = _tid.fillSidePanel;
+  _tid.fillSidePanel = exportFunction(function (side) {
+    if (side !== "user") return _f.call(_tid, side);
+
+    return exportFunction(function (html) {
+      // load or refresh the panel’s content
+      _f.call(_tid, side)(html);
+
+      var events = document.querySelectorAll("#tid_eventList .tid_eventItem");
+      var tsEvents = Array.filter(events, function ($event) {
+        var $title = $event.querySelector(".tid_title");
+        return $title.textContent.trim() === "Annonce Teacher Story";
+      }).map(function ($a) {
+        var match = /(\S+?) vous a envoyé un nouvel élève/.exec(
+          $a.querySelector(".tid_eventContent").lastChild.data);
+        var eventId = /\d+$/.exec($a.href)[0];
+        var isRead = $a.classList.contains("tid_read_true");
+
+        return [ match && match[1], eventId, isRead ];
+      });
+      tsEvents.forEach(txt => console.log(txt));
+    }, unsafeWindow);
+
+  }, unsafeWindow);
+
+  // trigger a load of the panel’s content
+  _tid.loadJS("/bar/user/", cloneInto({}, unsafeWindow));
 }());
 
 // [@RUN] Run That Script! /////////////////////////////////////////////
