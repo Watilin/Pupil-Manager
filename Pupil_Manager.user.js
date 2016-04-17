@@ -679,19 +679,20 @@ function expose(value, name) {
 
 // quick test
 (function () {
-  var _f = unsafeWindow._tid.fillSidePanel;
+  var _tid = unsafeWindow._tid;
+  var _initWS = _tid.initWS;
+  _tid.initWS = exportFunction(function () {
+    _initWS.call(_tid);
+    console.log('initWS has been called');
 
-  unsafeWindow._tid.fillSidePanel = exportFunction(function (side) {
-    if (side !== "user") return _f(side);
+    var ws = _tid.ws;
+    var _onmessage = ws.onmessage;
+    ws.onmessage = exportFunction(function (e) {
+      _onmessage.call(ws, e);
+      console.log(e.data);
+    }, _tid.ws);
 
-    return exportFunction(function (html) {
-      console.log(html.replace(/\s+/g, " "));
-      return _f.call(unsafeWindow._tid, side)(html);
-    }, unsafeWindow);
-
-  }, unsafeWindow._tid, {
-    defineAs: "fillSidePanel"
-  });
+  }, _tid);
 }());
 
 // [@RUN] Run That Script! /////////////////////////////////////////////
