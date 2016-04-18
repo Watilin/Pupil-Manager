@@ -2,7 +2,7 @@
 // @name          Pupil Manager
 // @namespace     fr.kergoz-panic.watilin
 // @description   Outil pour gérer l’envoi et la réception d’élèves dans Teacher-Story.
-// @version       1.2.1
+// @version       1.3
 //
 // @author        Watilin
 // @license       GPLv2; http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
@@ -23,9 +23,9 @@
 // @grant         GM_getValue
 // @grant         GM_setValue
 //
-// @resource      ui-html           ui.html?=v1.2.1
-// @resource      ui-style          ui.css?v=1.2.1
-// @resource      artwork           artwork.png?v=1.2.1
+// @resource      ui-html           ui.html
+// @resource      ui-style          ui.css
+// @resource      artwork           artwork.png
 // ==/UserScript==
 
 "use strict";
@@ -195,37 +195,35 @@ function injectUIButton() {
   var $refButton;
   var nPupils = 0;
   var $container;
-  var className;
+  var className = "";
+
+  var caseGame = function caseGame() {
+    $refButton = document.querySelector("#gameInfos .smallButton");
+    if ($refButton) {
+      nPupils = $refButton.onmouseover.toString()
+        .match(/<strong>(\d)/)[1];
+      $container = $refButton.parentElement;
+    } else {
+      $container = document.querySelector("#gameInfos");
+    }
+    className = "button smallButton";
+  };
 
   var caseTeacher = function caseTeacher() {
     $refButton = document.querySelector(".banner .button");
     if ($refButton) {
       nPupils = parseInt(
         document.querySelector(".banner strong").textContent, 10);
-      $container = $refButton.parentNode;
-    } else {
-      document.querySelector(".firstmenu").insertAdjacentHTML(
-        "afterend",
-        "<div class='clear'></div><div class='banner'></div>"
-      );
-      $container = document.querySelector(".banner");
-      $container.textContent = "Plus d’élèves à envoyer aujourd’hui… ";
+      $container = $refButton.parentElement;
+      className = "button mediumButton";
     }
-    className = "button mediumButton";
+    // doesn’t inject when no ref button was found
   };
 
   switch (location.pathname) {
     case "/":
     case "/game":
-      $refButton = document.querySelector("#gameInfos .button");
-      if ($refButton) {
-        nPupils = $refButton.onmouseover.toString()
-          .match(/<strong>(\d)/)[1];
-        $container = $refButton.parentNode;
-      } else {
-        $container = document.getElementById("gameInfos");
-      }
-      className = "button smallButton";
+      caseGame();
       break;
 
     case "/teacher":
@@ -239,9 +237,9 @@ function injectUIButton() {
 
     case "/tid/forum":
     case "/game/results":
-      // doesn’t inject Pupil Manager when the page has no
-      // regular “send student” button
-      // TODO check if /game/victory should go here too
+    case "/game/victory":
+      // doesn’t inject Pupil Manager when the page has no regular
+      // “send student” button
       return;
 
     default:
@@ -252,17 +250,19 @@ function injectUIButton() {
       }
   }
 
-  $button.className = className;
-  $container.appendChild(document.createTextNode(" "));
-  $container.appendChild($button);
+  if ($container) {
+    $button.className = className;
+    $container.appendChild(document.createTextNode(" "));
+    $container.appendChild($button);
 
-  var $ui;
-  $button.addEventListener("click", function (event) {
-    event.preventDefault();
-    if (!$ui) $ui = injectUIBox(nPupils);
-    $ui.style.display = "";
-    window.scrollTo(0, 0);
-  });
+    var $ui;
+    $button.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (!$ui) $ui = injectUIBox(nPupils);
+      $ui.style.display = "";
+      window.scrollTo(0, 0);
+    });
+  }
 
   return $button;
 }
@@ -314,7 +314,8 @@ function fillContactTable($container) {
       {
         sent:     {unsigned int}
         lastSent: {timestamp}
-        status:   {enum("ok", "alreadySent", "maxedOut", "error")}
+        status:   {enum("ok", "alreadySent", "maxedOut", "friendsOnly",
+                        "noMorePupils", "unknownPlayer", "error")}
       }
     */
     contacts.forEach(function (contact, i) {
@@ -346,6 +347,8 @@ function fillContactTable($container) {
         $picCell.appendChild($img);
       }
       $nameCell.textContent = contact.name;
+
+      // U+2665 = ❤ black heart suit
       $friendCell.textContent = contact.friend ? "\u2665" : "";
 
       var contactKey = tid + "-" + contact.id;
@@ -385,8 +388,7 @@ function fillContactTable($container) {
 
             onload: function (response) {
               var contactKey = tid + "-" + contact.id;
-              var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
-              if (!contactInfo) contactInfo = {};
+              var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
               if (!contactInfo.sent) contactInfo.sent = 0;
 
               var now = Date.now();
@@ -400,11 +402,20 @@ function fillContactTable($container) {
 
                 var text = response.responseText;
                 var status;
-                if (text.contains("a déjà un élève à votre nom")) {
-                  status = "alreadySent";
-                } else if (text.contains("a atteint le maximum")) {
-                  status = "maxedOut";
-                } else {
+                var reasons = {
+                  "a déjà un élève à votre nom" : "alreadySent",
+                  "a atteint le maximum"        : "maxedOut",
+                  "que les élèves de ses amis"  : "friendsOnly",
+                  "avez envoyé le maximum"      : "noMorePupils",
+                  "joueur inconnu"              : "unknownPlayer",
+                };
+
+                for (var r in reasons) if (text.contains(r)) {
+                  status = reasons[r];
+                  break;
+                }
+
+                if (!status) {
                   status = "error";
                   expose(text, "raisonInconnue");
                 }
@@ -596,7 +607,7 @@ function updateDateCell($cell, timestamp) {
   var diff = (Date.now() - date) / 1000;
   $cell.textContent =
     (diff < 60)        ? "< 1\xA0min" :
-    (diff < 3600)      ? "< 1\xA0h" :
+    (diff < 3600)      ? Math.floor(diff / 60) + "\xA0min":
     (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
     (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
     date.toLocaleDateString();
@@ -605,10 +616,13 @@ function updateDateCell($cell, timestamp) {
 }
 
 const StatusStrings = {
-  "ok"          : "ok",
-  "alreadySent" : "a déjà un élève",
-  "maxedOut"    : "a atteint le maximum",
-  "error"       : "raison inconnue"
+  "ok"           : "ok",
+  "alreadySent"  : "a déjà un élève",
+  "maxedOut"     : "a atteint le maximum",
+  "friendsOnly"  : "que les amis",
+  "noMorePupils" : "plus d’élèves",
+  "unknownPlayer": "pas un contact",
+  "error"        : "raison inconnue"
 };
 
 function updateStatusCell($cell, status) {
@@ -660,7 +674,7 @@ function expose(value, name) {
         });
         console.log("exposed function with name %s", name);
       } else {
-        throw new Error("can’t expose sandboxed function");
+        throw new Error("exportFunction is unavailable");
       }
       break;
     case "object":
@@ -668,7 +682,7 @@ function expose(value, name) {
         unsafeWindow[name] = cloneInto(value, unsafeWindow);
         console.log("exposed object with name %s", name);
       } else {
-        throw new Error("can’t expose sandboxed object");
+        throw new Error("cloneInto is unavailable");
       }
       break;
     default:
