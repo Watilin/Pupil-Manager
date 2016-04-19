@@ -34,6 +34,7 @@
  * [SHI] Shims for Retarded Browsers
  * [DAT] Data Retrieval
  * [UI]  UI Injection & Manipulation
+ * [INC] Incoming Pupils Management
  * [DEV] Development & Debug
  * [RUN] Run That Script!
  */
@@ -372,7 +373,6 @@ function fillContactTable($container) {
           var $button = this;
           if ($button.classList.contains("used")) return;
           if ($container.classList.contains("no-more-pupils")) return;
-          $button.classList.add("used");
           $button.textContent = "…";
 
           var params = [
@@ -384,9 +384,16 @@ function fillContactTable($container) {
           GM_xmlhttpRequest({
             method: "GET",
             url: "/sendStudent?" + params,
-            onerror: logRequestError,
+            onerror: function (resp) {
+              $button.textContent = "Réessayer";
+              $button.classList.add("retry");
+              updateStatusCell($statusCell, "network-error");
+              logRequestError(resp);
+            },
 
             onload: function (response) {
+              $button.classList.remove("retry");
+
               var contactKey = tid + "-" + contact.id;
               var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
               if (!contactInfo.sent) contactInfo.sent = 0;
@@ -397,9 +404,6 @@ function fillContactTable($container) {
 
               if (response.finalUrl.endsWith("/teacher")) { // failure
 
-                $button.textContent = "Échec";
-                $button.classList.add("failure");
-
                 var text = response.responseText;
                 var status;
                 var reasons = {
@@ -409,15 +413,18 @@ function fillContactTable($container) {
                   "avez envoyé le maximum"      : "noMorePupils",
                   "joueur inconnu"              : "unknownPlayer",
                 };
-
                 for (var r in reasons) if (text.contains(r)) {
                   status = reasons[r];
                   break;
                 }
-
-                if (!status) {
+                if (status) {
+                  $button.textContent = "Échec";
+                  $button.classList.add("failure", "used");
+                } else {
                   status = "error";
                   expose(text, "raisonInconnue");
+                  $button.textContent = "Réessayer";
+                  $button.classList.add("retry");
                 }
                 updateStatusCell($statusCell, status);
                 contactInfo.status = status;
@@ -430,7 +437,7 @@ function fillContactTable($container) {
                 contactInfo.status = "ok";
                 updateStatusCell($statusCell, "ok");
                 $button.textContent = "Ok\xA0!";
-                $button.classList.add("success");
+                $button.classList.add("success", "used");
                 var nPupils = parseInt($pupilsLeft.textContent, 10) - 1;
                 if (nPupils) {
                   $pupilsLeft.textContent = nPupils +
@@ -622,7 +629,8 @@ const StatusStrings = {
   "friendsOnly"  : "que les amis",
   "noMorePupils" : "plus d’élèves",
   "unknownPlayer": "pas un contact",
-  "error"        : "raison inconnue"
+  "error"        : "raison inconnue",
+  "network-error": "erreur réseau"
 };
 
 function updateStatusCell($cell, status) {
@@ -690,16 +698,17 @@ function expose(value, name) {
   }
 }
 
-// not-so-quick-anymore test
-(function () {
+// [@INC] Incoming Pupils Management ///////////////////////////////////
+
+function watchIncomingPupils() {
   var _tid = unsafeWindow._tid;
 
   // keep track of incoming events through the web socket
-  var hookWsOnmessage = function hookWsOnmessage(ws) {
+  var proxifyOnmessage = function proxifyOnmessage(ws) {
     var _onmessage = ws.onmessage;
     ws.onmessage = exportFunction(function (e) {
       // TODO check new incoming events
-      console.log("call to hooked onmessage");
+      console.log("call to proxified onmessage", e.data);
 
       _onmessage.call(ws, e);
     }, unsafeWindow);
@@ -707,13 +716,13 @@ function expose(value, name) {
 
   // generally, ws is not ready when this userscript executes
   if (_tid.ws) {
-    hookWsOnmessage(_tid.ws);
+    proxifyOnmessage(_tid.ws);
   } else {
     var _initWS = _tid.initWS;
     _tid.initWS = exportFunction(function () {
       _initWS.call(_tid);
       _tid.initWS = _initWS;
-      hookWsOnmessage(_tid.ws);
+      proxifyOnmessage(_tid.ws);
     }, unsafeWindow);
   }
 
@@ -729,27 +738,29 @@ function expose(value, name) {
       var events = document.querySelectorAll("#tid_eventList .tid_eventItem");
       var tsEvents = Array.filter(events, function ($event) {
         var $title = $event.querySelector(".tid_title");
-        return $title.textContent.trim() === "Annonce Teacher Story";
+        return "Annonce Teacher Story" === $title.textContent.trim();
       }).map(function ($a) {
-        var match = /(\S+?) vous a envoyé un nouvel élève/.exec(
-          $a.querySelector(".tid_eventContent").lastChild.data);
+        var contactName = /(\S+?) vous a envoyé un nouvel élève/.exec(
+          $a.querySelector(".tid_eventContent").lastChild.data)[1];
         var eventId = /\d+$/.exec($a.href)[0];
         var isRead = $a.classList.contains("tid_read_true");
 
-        return [ match && match[1], eventId, isRead ];
+        return [ contactName, eventId, isRead ];
       });
-      tsEvents.forEach(txt => console.log(txt));
+      // tsEvents.forEach(function (txt) { console.log(txt); });
     }, unsafeWindow);
 
   }, unsafeWindow);
 
   // trigger a load of the panel’s content
   _tid.loadJS("/bar/user/", cloneInto({}, unsafeWindow));
-}());
+}
 
 // [@RUN] Run That Script! /////////////////////////////////////////////
 
 injectUIStyle();
 injectUIButton();
+watchIncomingPupils();
 
-console.log("Pupil Manager ended successfully.");
+console.log("%c[\u2713]%c Pupil Manager ended successfully.",
+  "color: white; background-color: #280", "");
