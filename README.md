@@ -40,6 +40,10 @@ puissance de Pupil Manager.
 
 J'ai mis une license GPL, c'est ma faute, maintenant il faut que je tienne à jour la liste des changements. Alors voilà.
 
+* **[v1.2.2](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.2.2)**, 20/04/16
+
+  * Corrige un problème avec `@connect` qui empêchait le script de fonctionner sous Tampermonkey
+
 * **[v1.2.1](https://github.com/Watilin/Pupil-Manager/releases/tag/v1.2.1)**, 14/04/16
 
   * Résoud un problème d’injection des styles avec TamperMonkey
