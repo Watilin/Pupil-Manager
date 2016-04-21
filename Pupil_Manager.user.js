@@ -105,6 +105,10 @@ function requestContacts(callback) {
   });
 }
 
+const CONTACTS_PARSED_EVENT = "contactsParsed";
+var contactsAreParsed = false;
+var contactIds = {};
+
 function parseContacts(html) {
   var $div = document.createElement("div");
   $div.insertAdjacentHTML("afterbegin", html);
@@ -128,6 +132,7 @@ function parseContacts(html) {
           friend : isFriend,
           avatar : $avatar && $avatar.src
         });
+        contactIds[name] = id;
         break;
 
       case "sep":
@@ -144,6 +149,8 @@ function parseContacts(html) {
     $elt.remove();
   }
 
+  contactsAreParsed = true;
+  dispatchEvent(new CustomEvent(CONTACTS_PARSED_EVENT));
   return contacts;
 }
 
@@ -750,20 +757,33 @@ const LAST_EVENT_ID_VALUE_NAME = "lastEventId";
 function processEventBatch(eventBatch) {
   console.table(eventBatch);
   var lastEventId = parseInt(GM_getValue(LAST_EVENT_ID_VALUE_NAME, 0), 10);
-  console.log(lastEventId);
+  console.log("lastEventId =", lastEventId);
 
   var maxEventId = 0;
+  var nEvents = 0;
   eventBatch.forEach(function (event) {
-    // I make the assumption that event ids are strictly increasing
+    // making the assumption that event ids are strictly increasing
     if (event.eventId > lastEventId) {
+      maxEventId = Math.max(maxEventId, event.eventId);
       queryContactId(event.contactName, function (contactId) {
-        
+        if (contactId) {
+
+          // TODO
+
+        } else {
+
+          // TODO
+
+        }
+
+        nEvents--;
+        if (0 === nEvents) {
+          // GM_setValue(LAST_EVENT_ID_VALUE_NAME, maxEventId);
+        }
       });
     }
   });
 }
-
-const CONTACTS_PARSED_EVENT = "contactsParsed";
 
 function queryContactId(name, callback) {
   if (contactsAreParsed) {
@@ -771,7 +791,7 @@ function queryContactId(name, callback) {
       callback(contactIds[name]);
     }, 0);
   } else {
-    addEventListener("contactsParsed", function (event) {
+    addEventListener(CONTACTS_PARSED_EVENT, function (event) {
       callback(contactIds[name]);
     });
   }
