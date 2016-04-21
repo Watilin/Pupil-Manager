@@ -13,6 +13,7 @@
 // @updateURL     https://raw.githubusercontent.com/Watilin/Pupil-Manager/master/Pupil_Manager.meta.js
 //
 // @include       http://teacher-story.com/*
+// @connect       self
 // @connect       twinoid.com
 // @nocompat
 // @noframes
