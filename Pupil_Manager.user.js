@@ -34,8 +34,8 @@
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
  * [SHI] Shims for Retarded Browsers
  * [DAT] Data Retrieval
- * [UI]  UI Injection & Manipulation
- * [INC] Incoming Pupils Management
+ * [UIM]  UI Injection & Manipulation
+ * [INP] Incoming Pupils Management
  * [DEV] Development & Debug
  * [RUN] Run That Script!
  */
@@ -147,7 +147,7 @@ function parseContacts(html) {
   return contacts;
 }
 
-// [@UI] UI Injection & Manipulation ///////////////////////////////////
+// [@UIM] UI Injection & Manipulation //////////////////////////////////
 
 function injectUIStyle() {
   var $link = document.createElement("link");
@@ -314,10 +314,12 @@ function fillContactTable($container) {
     /* Contact structure in storage:
       key: {string} <userId>-<contactId> (example: "378517-1355707")
       {
-        sent:     {unsigned int}
-        lastSent: {timestamp}
-        status:   {enum("ok", "alreadySent", "maxedOut", "friendsOnly",
-                        "noMorePupils", "unknownPlayer", "error")}
+        sent:         {unsigned int}
+        lastSent:     {timestamp}
+        received:     {unsigned int}
+        lastReceived: {timestamp}
+        status:       {enum("ok", "alreadySent", "maxedOut", "friendsOnly",
+                            "noMorePupils", "unknownPlayer", "error")}
       }
     */
     contacts.forEach(function (contact, i) {
@@ -330,11 +332,10 @@ function fillContactTable($container) {
       var $picCell          = $row.querySelector(".pic");
       var $nameCell         = $row.querySelector(".name");
       var $friendCell       = $row.querySelector(".friend");
-      /*
-      TODO
+
       var $receivedCell     = $row.querySelector(".received");
       var $lastReceivedCell = $row.querySelector(".last-received");
-      */
+
       var $sentCell         = $row.querySelector(".sent");
       var $lastSentCell     = $row.querySelector(".last-sent");
       var $statusCell       = $row.querySelector(".status");
@@ -359,10 +360,19 @@ function fillContactTable($container) {
         $sentCell.textContent = contactInfo.sent;
         updateDateCell($lastSentCell, contactInfo.lastSent);
         updateStatusCell($statusCell, contactInfo.status);
+        if (contactInfo.received) {
+          $receivedCell.textContent = contactInfo.received;
+          updateDateCell($lastReceivedCell, contactInfo.lastReceived);
+        } else {
+          $receivedCell.textContent = "–";
+          $lastReceivedCell.textContent = "–";
+        }
       } else {
         $sentCell.textContent =     "–";
         $lastSentCell.textContent = "–";
         $statusCell.textContent =   "–";
+        $receivedCell.textContent =     "–";
+        $lastReceivedCell.textContent = "–";
       }
 
       var $pupilsLeft =
@@ -388,7 +398,7 @@ function fillContactTable($container) {
             onerror: function (resp) {
               $button.textContent = "Réessayer";
               $button.classList.add("retry");
-              updateStatusCell($statusCell, "network-error");
+              updateStatusCell($statusCell, "networkError");
               logRequestError(resp);
             },
 
@@ -618,20 +628,20 @@ function updateDateCell($cell, timestamp) {
     (diff < 3600)      ? Math.floor(diff / 60) + "\xA0min":
     (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
     (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
-    date.toLocaleDateString();
+    date.toLocaleDateString().replace(/\D\d{4}|\d{4}\D/, "");
   $cell.title = date.toLocaleDateString() + " " + date.toLocaleTimeString();
   $cell.dataset.timestamp = timestamp;
 }
 
 const StatusStrings = {
-  "ok"           : "ok",
-  "alreadySent"  : "a déjà un élève",
-  "maxedOut"     : "a atteint le maximum",
-  "friendsOnly"  : "que les amis",
-  "noMorePupils" : "plus d’élèves",
-  "unknownPlayer": "pas un contact",
-  "error"        : "raison inconnue",
-  "network-error": "erreur réseau"
+  "ok"            : "ok",
+  "alreadySent"   : "a déjà un élève",
+  "maxedOut"      : "a atteint le max",
+  "friendsOnly"   : "que les amis",
+  "noMorePupils"  : "plus d’élèves",
+  "unknownPlayer" : "pas un contact",
+  "error"         : "raison inconnue",
+  "networkError"  : "erreur réseau"
 };
 
 function updateStatusCell($cell, status) {
@@ -654,6 +664,117 @@ function highlightUpdate($elem) {
       $elem.classList.remove("updated");
     });
   });
+}
+
+// [@INP] Incoming Pupils Management ///////////////////////////////////
+
+function watchIncomingPupils() {
+  var _tid = unsafeWindow._tid;
+
+  // keep track of incoming events through the web socket
+  var proxifyOnmessage = function proxifyOnmessage(ws) {
+    var _onmessage = ws.onmessage;
+    ws.onmessage = exportFunction(function (e) {
+      // TODO check new incoming events
+      console.log("call to proxified onmessage", e.data);
+
+      _onmessage.call(ws, e);
+    }, unsafeWindow);
+  };
+
+  // generally, ws is not ready when this userscript executes
+  if (_tid.ws) {
+    proxifyOnmessage(_tid.ws);
+  } else {
+    var _initWS = _tid.initWS;
+    _tid.initWS = exportFunction(function () {
+      _initWS.call(_tid);
+      _tid.initWS = _initWS;
+      proxifyOnmessage(_tid.ws);
+    }, unsafeWindow);
+  }
+
+  // hook _tid.addEventNotifListener, just to see
+  (function () {
+    var _addEventNotifListener = _tid.addEventNotifListener;
+    _tid.addEventNotifListener = exportFunction(function () {
+      console.log.apply(console,
+        [ "addEventNotifListener" ].concat( Array.slice(arguments) ));
+      _addEventNotifListener.apply(_tid, arguments);
+    }, unsafeWindow);
+  }());
+
+  // hook fillSidePanel to retrieve panel content as soon as it loads
+  var _f = _tid.fillSidePanel;
+  _tid.fillSidePanel = exportFunction(function (side) {
+    if (side !== "user") return _f.call(_tid, side);
+
+    return exportFunction(function (html) {
+      // load or refresh the panel’s content
+      _f.call(_tid, side)(html);
+
+      var events = document.querySelectorAll("#tid_eventList .tid_eventItem");
+      var tsEvents = Array.filter(events, function ($event) {
+        var $title = $event.querySelector(".tid_title");
+        return "Annonce Teacher Story" === $title.textContent.trim();
+      }).map(function ($a) {
+        var contactName = /(\S+?) vous a envoyé un nouvel élève/.exec(
+          $a.querySelector(".tid_eventContent").lastChild.data)[1];
+        var eventId = parseInt(/\d+$/.exec($a.href)[0], 10);
+        var isRead = $a.classList.contains("tid_read_true");
+
+        return {
+          contactName : contactName,
+          eventId     : eventId,
+          isRead      : isRead
+        };
+      });
+      processEventBatch(tsEvents);
+    }, unsafeWindow);
+
+  }, unsafeWindow);
+
+  // trigger a load of the panel’s content
+  _tid.loadJS("/bar/user/", cloneInto({}, unsafeWindow));
+}
+
+const LAST_EVENT_ID_VALUE_NAME = "lastEventId";
+
+/**
+ * @param eventBatch {array} [ {
+ *    contactName: {string}
+ *    eventId:     {unsigned int}
+ *    isRead:      {boolean}
+ *  }* ]
+ */
+function processEventBatch(eventBatch) {
+  console.table(eventBatch);
+  var lastEventId = parseInt(GM_getValue(LAST_EVENT_ID_VALUE_NAME, 0), 10);
+  console.log(lastEventId);
+
+  var maxEventId = 0;
+  eventBatch.forEach(function (event) {
+    // I make the assumption that event ids are strictly increasing
+    if (event.eventId > lastEventId) {
+      queryContactId(event.contactName, function (contactId) {
+        
+      });
+    }
+  });
+}
+
+const CONTACTS_PARSED_EVENT = "contactsParsed";
+
+function queryContactId(name, callback) {
+  if (contactsAreParsed) {
+    setTimeout(function () {
+      callback(contactIds[name]);
+    }, 0);
+  } else {
+    addEventListener("contactsParsed", function (event) {
+      callback(contactIds[name]);
+    });
+  }
 }
 
 // [@DEV] Development & Debug //////////////////////////////////////////
@@ -697,64 +818,6 @@ function expose(value, name) {
     default:
       throw new Error("expose: unsupported type!");
   }
-}
-
-// [@INC] Incoming Pupils Management ///////////////////////////////////
-
-function watchIncomingPupils() {
-  var _tid = unsafeWindow._tid;
-
-  // keep track of incoming events through the web socket
-  var proxifyOnmessage = function proxifyOnmessage(ws) {
-    var _onmessage = ws.onmessage;
-    ws.onmessage = exportFunction(function (e) {
-      // TODO check new incoming events
-      console.log("call to proxified onmessage", e.data);
-
-      _onmessage.call(ws, e);
-    }, unsafeWindow);
-  };
-
-  // generally, ws is not ready when this userscript executes
-  if (_tid.ws) {
-    proxifyOnmessage(_tid.ws);
-  } else {
-    var _initWS = _tid.initWS;
-    _tid.initWS = exportFunction(function () {
-      _initWS.call(_tid);
-      _tid.initWS = _initWS;
-      proxifyOnmessage(_tid.ws);
-    }, unsafeWindow);
-  }
-
-  // hook fillSidePanel to retrieve panel content as soon as it loads
-  var _f = _tid.fillSidePanel;
-  _tid.fillSidePanel = exportFunction(function (side) {
-    if (side !== "user") return _f.call(_tid, side);
-
-    return exportFunction(function (html) {
-      // load or refresh the panel’s content
-      _f.call(_tid, side)(html);
-
-      var events = document.querySelectorAll("#tid_eventList .tid_eventItem");
-      var tsEvents = Array.filter(events, function ($event) {
-        var $title = $event.querySelector(".tid_title");
-        return "Annonce Teacher Story" === $title.textContent.trim();
-      }).map(function ($a) {
-        var contactName = /(\S+?) vous a envoyé un nouvel élève/.exec(
-          $a.querySelector(".tid_eventContent").lastChild.data)[1];
-        var eventId = /\d+$/.exec($a.href)[0];
-        var isRead = $a.classList.contains("tid_read_true");
-
-        return [ contactName, eventId, isRead ];
-      });
-      // tsEvents.forEach(function (txt) { console.log(txt); });
-    }, unsafeWindow);
-
-  }, unsafeWindow);
-
-  // trigger a load of the panel’s content
-  _tid.loadJS("/bar/user/", cloneInto({}, unsafeWindow));
 }
 
 // [@RUN] Run That Script! /////////////////////////////////////////////
