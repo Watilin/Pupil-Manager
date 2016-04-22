@@ -50,7 +50,25 @@
   bottom: 10px;
 }
 
-/* Loading indicator ------------------------------------------------ */
+/* Close Button ----------------------------------------------------- */
+
+#pupil-manager .close-button.cross {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 1.2em;
+  height: 1.2em;
+  font: bold 150%/1.2em Acme;
+  text-align: center;
+}
+
+#pupil-manager .close-button.cross:hover {
+  background: #0D7984;
+  color: white;
+  text-decoration: none;
+}
+
+/* Loading Indicator ------------------------------------------------ */
 
 #pupil-manager .loading {
   text-align: center;
@@ -126,7 +144,7 @@
 #pupil-manager .contacts th.sort.asc::before { content: "\25B2\00A0"; }
 #pupil-manager .contacts th.sort.desc::before { content: "\25BC\00A0"; }
 
-/* Action buttons --------------------------------------------------- */
+/* Action Buttons --------------------------------------------------- */
 
 #pupil-manager .contacts a.action.retry   { color: #E70;  }
 #pupil-manager .contacts a.action.success { color: green; }
@@ -150,7 +168,7 @@
   text-decoration: line-through;
 }
 
-/* Pagination buttons ----------------------------------------------- */
+/* Pagination Buttons ----------------------------------------------- */
 
 #pupil-manager .contacts a.active {
   font-weight: bold;

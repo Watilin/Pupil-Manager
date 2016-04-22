@@ -124,7 +124,7 @@ function parseContacts(html) {
       case "select friend":
         var match = $elt.getAttribute("tid_data").match(tidDataRegexp);
         var name = match[1];
-        var id = match[2];
+        var id = parseInt(match[2], 10);
         var $avatar = $elt.querySelector(".avatarImg");
         contacts.push({
           id     : id,
@@ -185,9 +185,20 @@ function injectUIBox(nPupils) {
 
   fillContactTable($ui);
 
-  $ui.querySelector(".button").addEventListener("click", function (event) {
-    event.preventDefault();
-    $ui.style.display = "none";
+  Array.forEach($ui.querySelectorAll(".close-button"),
+    function ($button) {
+      $button.addEventListener("click", function (event) {
+        event.preventDefault();
+        $ui.style.display = "none";
+      });
+    });
+
+  document.addEventListener('keydown', function (event) {
+    if (KeyEvent.DOM_VK_ESCAPE === event.keyCode &&
+        $ui.style.display !== "none") {
+      event.preventDefault();
+      $ui.style.display = "none";
+    }
   });
 
   var $content = document.querySelector(".content");
@@ -200,6 +211,7 @@ function injectUIButton() {
   var $button = document.createElement("a");
   $button.id = "pupil-manager-button";
   $button.textContent = "Pupil Manager";
+  $button.href = "#";
 
   var $refButton;
   var nPupils = 0;
@@ -768,10 +780,14 @@ function processEventBatch(eventBatch) {
       queryContactId(event.contactName, function (contactId) {
         if (contactId) {
 
+        console.log("%ccontactId found", "color: lime",
+                    event.contactName, contactId);
           // TODO
 
         } else {
 
+        console.log("%ccontactId not found", "color: red",
+                    event.contactName);
           // TODO
 
         }
