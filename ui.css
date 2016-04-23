@@ -58,7 +58,8 @@
   right: 1rem;
   width: 1.2em;
   height: 1.2em;
-  font: bold 150%/1.2em Acme;
+  font: bold 1.5em/1.2em
+    Acme, "Segoe UI", "Trebuchet MS", "Lucida Console", sans-serif;
   text-align: center;
 }
 

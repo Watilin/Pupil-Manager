@@ -33,8 +33,9 @@
 
 /* Table of Contents: use Ctrl+F and start with @, e.g. @DAT
  * [SHI] Shims for Retarded Browsers
+ * [CST] Constants
  * [DAT] Data Retrieval
- * [UIM]  UI Injection & Manipulation
+ * [UIM] UI Injection & Manipulation
  * [INP] Incoming Pupils Management
  * [DEV] Development & Debug
  * [RUN] Run That Script!
@@ -70,7 +71,28 @@ if (!("endsWith" in String.prototype)) {
   };
 }
 
+// [@CST] Constants ////////////////////////////////////////////////////
+
+const StatusStrings = {
+  "ok"            : "ok",
+  "alreadySent"   : "a déjà un élève",
+  "maxedOut"      : "a atteint le max",
+  "friendsOnly"   : "que les amis",
+  "noMorePupils"  : "plus d’élèves",
+  "unknownPlayer" : "pas un contact",
+  "error"         : "raison inconnue",
+  "networkError"  : "erreur réseau"
+};
+const CONTACTS_PARSED_EVENT = "contactsParsed";
+const GMVALUE_LAST_EVENT_ID = "lastEventId";
+const GMVALUE_LAST_EVENT_TIME = "lastEventTime";
+const GMVALUE_UNKNOWN_CONTACTS = "unknownContacts";
+
 // [@DAT] Data Retrieval ///////////////////////////////////////////////
+
+function getTid() {
+  return unsafeWindow._tid.session.tid;
+}
 
 function requestContacts(callback) {
   var params = [
@@ -105,7 +127,6 @@ function requestContacts(callback) {
   });
 }
 
-const CONTACTS_PARSED_EVENT = "contactsParsed";
 var contactsAreParsed = false;
 var contactIds = {};
 
@@ -148,6 +169,11 @@ function parseContacts(html) {
     }
     $elt.remove();
   }
+
+  var unknownContacts = JSON.parse(GM_getValue(GMVALUE_UNKNOWN_CONTACTS, "[]"));
+  contacts = contacts.concat(unknownContacts);
+  // do not put unknownContact names into contactIds, as these names
+  // may not be up-to-date
 
   contactsAreParsed = true;
   dispatchEvent(new CustomEvent(CONTACTS_PARSED_EVENT));
@@ -297,7 +323,6 @@ function fillContactTable($container) {
     var activePage;
 
     var contacts = parseContacts(html);
-    var tid = unsafeWindow._tid.session.tid;
 
     var $$sortables = $container.getElementsByClassName("sortable");
     Array.forEach($$sortables, function ($sortable) {
@@ -336,10 +361,12 @@ function fillContactTable($container) {
         sent:         {unsigned int}
         lastSent:     {timestamp}
         received:     {unsigned int}
-        lastReceived: {timestamp}
+        lastReceived: {timestamp} | -1
         status:       {enum("ok", "alreadySent", "maxedOut", "friendsOnly",
                             "noMorePupils", "unknownPlayer", "error")}
       }
+      A -1 for lastReceived means that data is present but the date is
+      unknown.
     */
     contacts.forEach(function (contact, i) {
       if (!(i % 10)) $tbody = $table.createTBody();
@@ -373,7 +400,7 @@ function fillContactTable($container) {
       // U+2665 = ❤ black heart suit
       $friendCell.textContent = contact.friend ? "\u2665" : "";
 
-      var contactKey = tid + "-" + contact.id;
+      var contactKey = getTid() + "-" + contact.id;
       var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
       if (contactInfo) {
         $sentCell.textContent = contactInfo.sent;
@@ -424,7 +451,7 @@ function fillContactTable($container) {
             onload: function (response) {
               $button.classList.remove("retry");
 
-              var contactKey = tid + "-" + contact.id;
+              var contactKey = getTid() + "-" + contact.id;
               var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
               if (!contactInfo.sent) contactInfo.sent = 0;
 
@@ -484,7 +511,7 @@ function fillContactTable($container) {
               }
               $sentCell.textContent = contactInfo.sent;
               GM_setValue(contactKey, JSON.stringify(contactInfo));
-              console.log("contact info saved");
+              console.log("contact info saved (sending pupil)");
             }
           });
         });
@@ -565,7 +592,6 @@ function fillContactTable($container) {
       buttons[0].classList.add("active");
       activePage = 1;
     }
-
 
     $table.style.display = "";
     $table.querySelector("tbody").style.display = "";
@@ -652,17 +678,6 @@ function updateDateCell($cell, timestamp) {
   $cell.dataset.timestamp = timestamp;
 }
 
-const StatusStrings = {
-  "ok"            : "ok",
-  "alreadySent"   : "a déjà un élève",
-  "maxedOut"      : "a atteint le max",
-  "friendsOnly"   : "que les amis",
-  "noMorePupils"  : "plus d’élèves",
-  "unknownPlayer" : "pas un contact",
-  "error"         : "raison inconnue",
-  "networkError"  : "erreur réseau"
-};
-
 function updateStatusCell($cell, status) {
   $cell.textContent = StatusStrings[status];
 }
@@ -690,29 +705,6 @@ function highlightUpdate($elem) {
 function watchIncomingPupils() {
   var _tid = unsafeWindow._tid;
 
-  // keep track of incoming events through the web socket
-  var proxifyOnmessage = function proxifyOnmessage(ws) {
-    var _onmessage = ws.onmessage;
-    ws.onmessage = exportFunction(function (e) {
-      // TODO check new incoming events
-      console.log("call to proxified onmessage", e.data);
-
-      _onmessage.call(ws, e);
-    }, unsafeWindow);
-  };
-
-  // generally, ws is not ready when this userscript executes
-  if (_tid.ws) {
-    proxifyOnmessage(_tid.ws);
-  } else {
-    var _initWS = _tid.initWS;
-    _tid.initWS = exportFunction(function () {
-      _initWS.call(_tid);
-      _tid.initWS = _initWS;
-      proxifyOnmessage(_tid.ws);
-    }, unsafeWindow);
-  }
-
   // hook _tid.addEventNotifListener, just to see
   (function () {
     var _addEventNotifListener = _tid.addEventNotifListener;
@@ -737,9 +729,9 @@ function watchIncomingPupils() {
         var $title = $event.querySelector(".tid_title");
         return "Annonce Teacher Story" === $title.textContent.trim();
       }).map(function ($a) {
-        var contactName = /(\S+?) vous a envoyé un nouvel élève/.exec(
-          $a.querySelector(".tid_eventContent").lastChild.data)[1];
-        var eventId = parseInt(/\d+$/.exec($a.href)[0], 10);
+        var contactName = $a.querySelector(".tid_eventContent").lastChild.data
+          .match(/(\S+?) vous a envoyé un nouvel élève/)[1];
+        var eventId = parseInt($a.href.match(/\d+$/)[0], 10);
         var isRead = $a.classList.contains("tid_read_true");
 
         return {
@@ -757,8 +749,6 @@ function watchIncomingPupils() {
   _tid.loadJS("/bar/user/", cloneInto({}, unsafeWindow));
 }
 
-const LAST_EVENT_ID_VALUE_NAME = "lastEventId";
-
 /**
  * @param eventBatch {array} [ {
  *    contactName: {string}
@@ -768,33 +758,46 @@ const LAST_EVENT_ID_VALUE_NAME = "lastEventId";
  */
 function processEventBatch(eventBatch) {
   console.table(eventBatch);
-  var lastEventId = parseInt(GM_getValue(LAST_EVENT_ID_VALUE_NAME, 0), 10);
-  console.log("lastEventId =", lastEventId);
+
+  var lastEventId = parseInt(GM_getValue(GMVALUE_LAST_EVENT_ID, 0), 10);
+  var lastEventTime = parseInt(GM_getValue(GMVALUE_LAST_EVENT_TIME, 0), 10);
+  console.log("lastEventId = %d\nlastEventTime = %d",
+              lastEventId, lastEventTime);
 
   var maxEventId = 0;
-  var nEvents = 0;
+  var now = Date.now();
+
+  var updateLastEventInfos = function () {
+    GM_setValue(GMVALUE_LAST_EVENT_ID, maxEventId);
+    GM_setValue(GMVALUE_LAST_EVENT_TIME, now);
+    console.log("updated last event id and time");
+  };
+
+  var nEvents = eventBatch.length;
   eventBatch.forEach(function (event) {
     // making the assumption that event ids are strictly increasing
     if (event.eventId > lastEventId) {
       maxEventId = Math.max(maxEventId, event.eventId);
       queryContactId(event.contactName, function (contactId) {
         if (contactId) {
-
-        console.log("%ccontactId found", "color: lime",
-                    event.contactName, contactId);
-          // TODO
-
+          updateReceivedStats(contactId, lastEventTime, now);
+          nEvents = decreaseAndCallIfZero(nEvents, updateLastEventInfos);
         } else {
-
-        console.log("%ccontactId not found", "color: red",
-                    event.contactName);
-          // TODO
-
-        }
-
-        nEvents--;
-        if (0 === nEvents) {
-          // GM_setValue(LAST_EVENT_ID_VALUE_NAME, maxEventId);
+          GM_xmlhttpRequest({
+            method: "GET",
+            url: "http://twinoid.com/ev/" + event.eventId,
+            onerror: logRequestError,
+            onload: function (gmResp) {
+              var match = gmResp.responseText.match(/\btid_id="(\d+)"/);
+              if (!match) {
+                console.warn("parsing of /ev/%d failed", event.eventId);
+                return;
+              }
+              updateReceivedStats(parseInt(match[1], 10),
+                lastEventTime, now);
+              nEvents = decreaseAndCallIfZero(nEvents, updateLastEventInfos);
+            }
+          });
         }
       });
     }
@@ -811,6 +814,30 @@ function queryContactId(name, callback) {
       callback(contactIds[name]);
     });
   }
+}
+
+function updateReceivedStats(contactId, lastEventTime, now) {
+  if (undefined === contactId) {
+    throw new Error("updateReceivedStats expects at least one argument");
+  }
+  lastEventTime = lastEventTime !== undefined ? lastEventTime :
+    parseInt(GM_getValue(GMVALUE_LAST_EVENT_TIME), 10);
+  now = now || Date.now();
+
+  var contactKey = getTid() + "-" + contactId;
+  var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
+  var received = contactInfo.received || 0;
+  contactInfo.received = received + 1;
+  contactInfo.lastReceived = lastEventTime ? now : -1;
+
+  // GM_setValue(contactKey, JSON.stringify(contactInfo));
+  console.log("contact info saved (side panel events)");
+}
+
+function decreaseAndCallIfZero(n, callback) {
+  n--;
+  if (0 === n) callback();
+  return n;
 }
 
 // [@DEV] Development & Debug //////////////////////////////////////////
