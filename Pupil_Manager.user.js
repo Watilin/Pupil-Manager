@@ -705,16 +705,6 @@ function highlightUpdate($elem) {
 function watchIncomingPupils() {
   var _tid = unsafeWindow._tid;
 
-  // hook _tid.addEventNotifListener, just to see
-  (function () {
-    var _addEventNotifListener = _tid.addEventNotifListener;
-    _tid.addEventNotifListener = exportFunction(function () {
-      console.log.apply(console,
-        [ "addEventNotifListener" ].concat( Array.slice(arguments) ));
-      _addEventNotifListener.apply(_tid, arguments);
-    }, unsafeWindow);
-  }());
-
   // hook fillSidePanel to retrieve panel content as soon as it loads
   var _f = _tid.fillSidePanel;
   _tid.fillSidePanel = exportFunction(function (side) {
