@@ -79,14 +79,14 @@ const StatusStrings = {
   "maxedOut"      : "a atteint le max",
   "friendsOnly"   : "que les amis",
   "noMorePupils"  : "plus d’élèves",
-  "unknownPlayer" : "pas un contact",
+  "unknownPlayer" : "joueur inconnu",
   "error"         : "raison inconnue",
   "networkError"  : "erreur réseau"
 };
-const CONTACTS_PARSED_EVENT = "contactsParsed";
+
 const GMVALUE_LAST_EVENT_ID = "lastEventId";
 const GMVALUE_LAST_EVENT_TIME = "lastEventTime";
-const GMVALUE_UNKNOWN_CONTACTS = "unknownContacts";
+const GMVALUE_NON_CONTACT_PLAYERS = "nonContactPlayers";
 
 // [@DAT] Data Retrieval ///////////////////////////////////////////////
 
@@ -127,7 +127,6 @@ function requestContacts(callback) {
   });
 }
 
-var contactsAreParsed = false;
 var contactIds = {};
 
 function parseContacts(html) {
@@ -139,6 +138,9 @@ function parseContacts(html) {
   var isFriend = true;
   var tidDataRegexp = /^([^\/]+)\/(\d+)$/;
 
+  var nonContacts = JSON.parse(GM_getValue(GMVALUE_NON_CONTACT_PLAYERS, "[]"));
+  console.log("nonContacts", nonContacts);
+
   var $elt;
   while ($elt = $contacts.firstElementChild) {
     switch ($elt.className) {
@@ -148,12 +150,20 @@ function parseContacts(html) {
         var id = parseInt(match[2], 10);
         var $avatar = $elt.querySelector(".avatarImg");
         contacts.push({
-          id     : id,
-          name   : name,
-          friend : isFriend,
-          avatar : $avatar && $avatar.src
+          id       : id,
+          name     : name,
+          isFriend : isFriend,
+          avatar   : $avatar && $avatar.src
         });
         contactIds[name] = id;
+
+        // remove a nonContact when found in the contacts
+        for (var i = nonContacts.length; i--; ) {
+          if (nonContacts[i].id === id) {
+            nonContacts.splice(i, 1);
+            break;
+          }
+        }
         break;
 
       case "sep":
@@ -169,14 +179,12 @@ function parseContacts(html) {
     }
     $elt.remove();
   }
+  contacts = contacts.concat(nonContacts);
 
-  var unknownContacts = JSON.parse(GM_getValue(GMVALUE_UNKNOWN_CONTACTS, "[]"));
-  contacts = contacts.concat(unknownContacts);
-  // do not put unknownContact names into contactIds, as these names
+  // do not put nonContacts names into contactIds, as these names
   // may not be up-to-date
 
-  contactsAreParsed = true;
-  dispatchEvent(new CustomEvent(CONTACTS_PARSED_EVENT));
+  GM_setValue(GMVALUE_NON_CONTACT_PLAYERS, JSON.stringify(nonContacts));
   return contacts;
 }
 
@@ -219,7 +227,7 @@ function injectUIBox(nPupils) {
       });
     });
 
-  document.addEventListener('keydown', function (event) {
+  document.addEventListener("keydown", function (event) {
     if (KeyEvent.DOM_VK_ESCAPE === event.keyCode &&
         $ui.style.display !== "none") {
       event.preventDefault();
@@ -322,8 +330,6 @@ function fillContactTable($container) {
     var buttons = [];
     var activePage;
 
-    var contacts = parseContacts(html);
-
     var $$sortables = $container.getElementsByClassName("sortable");
     Array.forEach($$sortables, function ($sortable) {
       $sortable.addEventListener("click", function () {
@@ -355,6 +361,8 @@ function fillContactTable($container) {
     $modelRow.classList.remove("model");
 
     var $tbody;
+
+    var contacts = parseContacts(html);
     /* Contact structure in storage:
       key: {string} <userId>-<contactId> (example: "378517-1355707")
       {
@@ -398,26 +406,32 @@ function fillContactTable($container) {
       $nameCell.textContent = contact.name;
 
       // U+2665 = ❤ black heart suit
-      $friendCell.textContent = contact.friend ? "\u2665" : "";
+      $friendCell.textContent = contact.isFriend ? "\u2665" : "";
+
+      if (contact.isNonContact) {
+        // U+2661 = ♡ white heart suit
+        $friendCell.textContent = "\u2661";
+        $friendCell.title = "Ce joueur ne fait pas partie de vos contacts";
+      }
 
       var contactKey = getTid() + "-" + contact.id;
       var contactInfo = JSON.parse(GM_getValue(contactKey, "null"));
-      if (contactInfo) {
+
+      if (contactInfo && contactInfo.status) {
         $sentCell.textContent = contactInfo.sent;
         updateDateCell($lastSentCell, contactInfo.lastSent);
         updateStatusCell($statusCell, contactInfo.status);
-        if (contactInfo.received) {
-          $receivedCell.textContent = contactInfo.received;
-          updateDateCell($lastReceivedCell, contactInfo.lastReceived);
-        } else {
-          $receivedCell.textContent = "–";
-          $lastReceivedCell.textContent = "–";
-        }
       } else {
         $sentCell.textContent =     "–";
         $lastSentCell.textContent = "–";
         $statusCell.textContent =   "–";
-        $receivedCell.textContent =     "–";
+      }
+
+      if (contactInfo && contactInfo.received) {
+        $receivedCell.textContent = contactInfo.received;
+        updateDateCell($lastReceivedCell, contactInfo.lastReceived);
+      } else {
+        $receivedCell.textContent = "–";
         $lastReceivedCell.textContent = "–";
       }
 
@@ -666,15 +680,20 @@ function sortContactTable($table, criterion, direction) {
 }
 
 function updateDateCell($cell, timestamp) {
-  var date = new Date(timestamp);
-  var diff = (Date.now() - date) / 1000;
-  $cell.textContent =
-    (diff < 60)        ? "< 1\xA0min" :
-    (diff < 3600)      ? Math.floor(diff / 60) + "\xA0min":
-    (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
-    (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
-    date.toLocaleDateString().replace(/\D\d{4}|\d{4}\D/, "");
-  $cell.title = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  if (-1 === timestamp) {
+    $cell.textContent = "?";
+    $cell.title = "Date inconnue";
+  } else {
+    var date = new Date(timestamp);
+    var diff = (Date.now() - date) / 1000;
+    $cell.textContent =
+      (diff < 60)        ? "< 1\xA0min" :
+      (diff < 3600)      ? Math.floor(diff / 60) + "\xA0min":
+      (diff < 86400)     ? Math.floor(diff / 3600) + "\xA0h" :
+      (diff < 3 * 86400) ? Math.floor(diff / 86400) + "\xA0j" :
+      date.toLocaleDateString().replace(/\D\d{4}|\d{4}\D/, "");
+    $cell.title = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  }
   $cell.dataset.timestamp = timestamp;
 }
 
@@ -714,8 +733,8 @@ function watchIncomingPupils() {
       // load or refresh the panel’s content
       _f.call(_tid, side)(html);
 
-      var events = document.querySelectorAll("#tid_eventList .tid_eventItem");
-      var tsEvents = Array.filter(events, function ($event) {
+      var $$events = document.querySelectorAll("#tid_eventList .tid_eventItem");
+      var tsEvents = Array.filter($$events, function ($event) {
         var $title = $event.querySelector(".tid_title");
         return "Annonce Teacher Story" === $title.textContent.trim();
       }).map(function ($a) {
@@ -749,85 +768,92 @@ function watchIncomingPupils() {
 function processEventBatch(eventBatch) {
   console.table(eventBatch);
 
-  var lastEventId = parseInt(GM_getValue(GMVALUE_LAST_EVENT_ID, 0), 10);
+  var lastEventId   = parseInt(GM_getValue(GMVALUE_LAST_EVENT_ID, 0), 10);
   var lastEventTime = parseInt(GM_getValue(GMVALUE_LAST_EVENT_TIME, 0), 10);
-  console.log("lastEventId = %d\nlastEventTime = %d",
+  console.log("lastEventId =%o\nlastEventTime =%o",
               lastEventId, lastEventTime);
 
   var maxEventId = 0;
   var now = Date.now();
+  var nonContactPlayers =
+    JSON.parse(GM_getValue(GMVALUE_NON_CONTACT_PLAYERS, "[]"));
 
-  var updateLastEventInfos = function () {
-    GM_setValue(GMVALUE_LAST_EVENT_ID, maxEventId);
-    GM_setValue(GMVALUE_LAST_EVENT_TIME, now);
-    console.log("updated last event id and time");
+  var updateReceivedStats = function (contactId) {
+    var contactKey = getTid() + "-" + contactId;
+    var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
+
+    var received = contactInfo.received || 0;
+    contactInfo.received     = received + 1;
+    contactInfo.lastReceived = lastEventTime ? now : -1;
+
+    GM_setValue(contactKey, JSON.stringify(contactInfo));
+    console.log("contact %c%s%c: info saved (side panel events)",
+      "color: #FE7", contactId, "");
   };
 
   var nEvents = eventBatch.length;
+  var countDownEvents = function countDownEvents() {
+    nEvents--;
+    if (nEvents > 0) return;
+
+    GM_setValue(GMVALUE_LAST_EVENT_ID, maxEventId);
+    GM_setValue(GMVALUE_LAST_EVENT_TIME, now);
+    GM_setValue(GMVALUE_NON_CONTACT_PLAYERS, JSON.stringify(nonContactPlayers));
+    console.log(
+      "updated:\nlastEventId =%o\nlastEventTime =%o\nnonContactPlayers =%o",
+      maxEventId, now, nonContactPlayers);
+  };
+
   eventBatch.forEach(function (event) {
+    maxEventId = Math.max(maxEventId, event.eventId);
+
     // making the assumption that event ids are strictly increasing
-    if (event.eventId > lastEventId) {
-      maxEventId = Math.max(maxEventId, event.eventId);
-      queryContactId(event.contactName, function (contactId) {
-        if (contactId) {
-          updateReceivedStats(contactId, lastEventTime, now);
-          nEvents = decreaseAndCallIfZero(nEvents, updateLastEventInfos);
-        } else {
-          GM_xmlhttpRequest({
-            method: "GET",
-            url: "http://twinoid.com/ev/" + event.eventId,
-            onerror: logRequestError,
-            onload: function (gmResp) {
-              var match = gmResp.responseText.match(/\btid_id="(\d+)"/);
-              if (!match) {
-                console.warn("parsing of /ev/%d failed", event.eventId);
-                return;
-              }
-              updateReceivedStats(parseInt(match[1], 10),
-                lastEventTime, now);
-              nEvents = decreaseAndCallIfZero(nEvents, updateLastEventInfos);
-            }
-          });
-        }
-      });
+    if (event.eventId <= lastEventId) {
+      countDownEvents();
+      return;
     }
+
+    console.log("%crequesting contact id for %s", "color: green", event.contactName);
+    queryContactId(event.eventId, function (contactId, sorry) {
+      if (!contactId) {
+        console.warn(sorry);
+        return;
+      }
+
+      console.log("%crequest for %s successful", "color: lime", event.contactName);
+      if (!nonContactPlayers.some(function (ncp) {
+            return ncp.id === contactId;
+          })) {
+        nonContactPlayers.push({
+          id           : contactId,
+          name         : event.contactName,
+          isNonContact : true
+        });
+      }
+      updateReceivedStats(contactId);
+      countDownEvents();
+    });
   });
 }
 
-function queryContactId(name, callback) {
-  if (contactsAreParsed) {
-    setTimeout(function () {
-      callback(contactIds[name]);
-    }, 0);
-  } else {
-    addEventListener(CONTACTS_PARSED_EVENT, function (event) {
-      callback(contactIds[name]);
-    });
-  }
-}
+function queryContactId(eventId, callback) {
+  GM_xmlhttpRequest({
+    method: "GET",
+    url: "http://twinoid.com/ev/" + eventId,
+    onerror: function (gmResp) {
+      logRequestError(gmResp);
+      callback(null, "network error");
+    },
+    onload: function (gmResp) {
+      var match = gmResp.responseText.match(/\btid_id="(\d+)"/);
+      if (!match) {
+        callback(null, "parsing failed");
+      } else {
+        callback(parseInt(match[1], 10));
+      }
+    }
+  });
 
-function updateReceivedStats(contactId, lastEventTime, now) {
-  if (undefined === contactId) {
-    throw new Error("updateReceivedStats expects at least one argument");
-  }
-  lastEventTime = lastEventTime !== undefined ? lastEventTime :
-    parseInt(GM_getValue(GMVALUE_LAST_EVENT_TIME), 10);
-  now = now || Date.now();
-
-  var contactKey = getTid() + "-" + contactId;
-  var contactInfo = JSON.parse(GM_getValue(contactKey, "{}"));
-  var received = contactInfo.received || 0;
-  contactInfo.received = received + 1;
-  contactInfo.lastReceived = lastEventTime ? now : -1;
-
-  // GM_setValue(contactKey, JSON.stringify(contactInfo));
-  console.log("contact info saved (side panel events)");
-}
-
-function decreaseAndCallIfZero(n, callback) {
-  n--;
-  if (0 === n) callback();
-  return n;
 }
 
 // [@DEV] Development & Debug //////////////////////////////////////////
@@ -839,6 +865,7 @@ function logRequestError(resp) {
 }
 
 function expose(value, name) {
+  name = name || "_";
   while (name in unsafeWindow) {
     name += Math.random().toString(36).substr(2);
   }

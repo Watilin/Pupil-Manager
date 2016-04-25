@@ -31,7 +31,6 @@
   min-width: 480px;
   max-width: 960px;
   min-height: 329px;
-  max-height: 700px;
 }
 
 /* Mimicking -------------------------------------------------------- */
@@ -115,7 +114,7 @@
   display: block;
   margin: auto;
 }
-#pupil-manager .contacts table .last-sent[title] {
+#pupil-manager .contacts table td[title] {
   cursor: help;
 }
 
@@ -133,7 +132,6 @@
   color: white;
   background: #4A9BA3;
 }
-
 
 #pupil-manager .contacts tbody tr:hover a {
   color: white;
